@@ -244,8 +244,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--num-predict",
         type=int,
-        default=2048,
+        default=8192,
         help="Maximum response tokens Ollama can generate per image. Use 0 for the model default.",
+    )
+    parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=16384,
+        help=(
+            "Context window size in tokens. This must be large enough to hold the "
+            "prompt, the image tokens, AND the full JSON response. Ollama defaults to "
+            "only 4096, which silently truncates big tables (e.g. tables 4.6-4.8) and "
+            "makes them look like failed reads. Use 0 for the model default."
+        ),
     )
     return parser
 
@@ -580,17 +591,25 @@ def call_ollama_image(
     max_image_side: int,
     num_predict: int,
     response_format: str | None = None,
+    num_ctx: int = 0,
 ) -> str:
     """Send one image and one prompt to Ollama, then return the model text.
 
     This is the only function that talks directly to Ollama. Keeping the
     Ollama call in one place makes resizing, token limits, and cleanup easier
     to reason about.
+
+    num_ctx sets the context window. Ollama's default is only 4096 tokens, which
+    is too small once the prompt plus the image plus a large JSON response are
+    added together. Big tables overflow it and come back empty or truncated, so
+    the caller should pass a generous value.
     """
     ollama_image_path, temporary_path = prepare_image_for_ollama(image_path, max_image_side)
     options = {"temperature": 0}
     if num_predict > 0:
         options["num_predict"] = num_predict
+    if num_ctx > 0:
+        options["num_ctx"] = num_ctx
 
     request: dict[str, Any] = {
         "model": model,
@@ -787,6 +806,7 @@ def parse_tidy_image(
     num_predict: int,
     previous_context: str = "",
     previous_plot_rows: list[dict[str, str]] | None = None,
+    num_ctx: int = 0,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     """Parse one image into table rows, plot rows, and observation rows.
 
@@ -811,6 +831,7 @@ def parse_tidy_image(
         max_image_side=max_image_side,
         num_predict=num_predict,
         response_format="json",
+        num_ctx=num_ctx,
     )
     parsed = extract_json_object(raw_response)
 
@@ -1127,6 +1148,7 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
                 args.num_predict,
                 previous_context=page_context,
                 previous_plot_rows=prev_plot_rows,
+                num_ctx=args.num_ctx,
             )
             observation_rows.extend(image_observations)
             successful += 1

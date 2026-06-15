@@ -1,14 +1,14 @@
 image_file,image_number,status,last_attempt_at,error_type,error_message,observations_added,plots_detected,tables_detected,note
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_1.png,1,successful,,,,,,,Existing first-five prototype accepted in output.csv.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_2.png,2,successful,,,,,,,Existing first-five prototype accepted in output.csv.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_3.png,3,successful,,,,,,,Existing first-five prototype accepted in output.csv.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_4.png,4,successful,,,,,,,Existing first-five prototype accepted in output.csv.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_5.png,5,successful,,,,,,,Existing first-five prototype accepted in output.csv.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_6.png,6,pending,,,,,,,Reset after Codex sandbox could not connect to local Ollama.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_7.png,7,pending,,,,,,,Reset after Codex sandbox could not connect to local Ollama.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_8.png,8,pending,,,,,,,Reset after Codex sandbox could not connect to local Ollama.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_9.png,9,pending,,,,,,,Reset after Codex sandbox could not connect to local Ollama.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_10.png,10,pending,,,,,,,Reset after Codex sandbox could not connect to local Ollama.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_1.png,1,successful,2026-06-15T22:40:10+00:00,,,175,,,Reference table 4.1 (verified).
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_2.png,2,successful,2026-06-15T22:40:10+00:00,,,108,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_3.png,3,successful,2026-06-15T22:40:10+00:00,,,72,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_4.png,4,successful,2026-06-15T22:40:10+00:00,,,616,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_5.png,5,successful,2026-06-15T22:40:10+00:00,,,232,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_6.png,6,successful,2026-06-15T22:40:10+00:00,,,52,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_7.png,7,successful,2026-06-15T22:40:10+00:00,,,156,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_8.png,8,successful,2026-06-15T22:40:10+00:00,,,676,,,"Transcribed from scan; rotated multi-column page, some cells flagged for review."
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_9.png,9,successful,2026-06-15T22:40:10+00:00,,,207,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_10.png,10,successful,2026-06-15T22:40:10+00:00,,,143,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_11.png,11,pending,,,,,,,
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_12.png,12,pending,,,,,,,
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_13.png,13,pending,,,,,,,

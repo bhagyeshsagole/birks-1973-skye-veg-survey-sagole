@@ -257,6 +257,36 @@
 - If the model still returns no plot rows for a continuation page (expected, since no headers are visible), the script falls back to the previous page's plot rows so every observation row still inherits correct releve IDs and coordinate metadata.
 - Updated `prompts/csv_parsing_instructions.md` with an explicit note at the top explaining multi-page tables and telling the model not to treat a headerless continuation page as a bad read.
 
-## 35. Images 6-10 Parse Attempt Blocked
+## 36. Images 6-10 Parse Attempt Blocked
 - Tried to run images 6-10 from Codex, but the sandbox could not connect to local Ollama and escalation approval timed out.
 - No scientific rows were added; `output.csv` remains 175 rows and images 6-10 were reset to pending in `image_tracking.csv`.
+
+## 37. Context-Window Bug Fixed (Images 6-10 Now Parse)
+- Images 6, 7, and 8 kept failing with "did not contain plots or observations". The images were fine; the script was the problem.
+- Root cause: the parser never set Ollama's context window, so it used the default of only 4096 tokens. Small tables like 4.1 fit, but the bigger tables overflowed.
+  - Table 4.6 has two stacked sub-tables with a two-panel side-by-side species layout.
+  - Table 4.7 has 12 releve columns split into two subassociations.
+  - Table 4.8 is a wide sideways table with ~36 releve columns.
+- For these, the prompt + image + expected JSON response exceeded 4096 tokens. Ollama either rejected the request outright (HTTP 400 "exceeds the available context size") or truncated the JSON, which looked like a failed read.
+- Fix: added a `--num-ctx` option (default 16384) and pass it into the Ollama call. Also raised the default `--num-predict` to 8192 so long tables have room to finish the JSON response.
+- Verified after the fix: image 6 returned 7 plots and 48 observations; image 7 returned 7 plots and 13 observations. No more empty-response failures.
+- Re-ran the full pipeline on images 1-10 with `--max-image-side 1280 --num-predict 8192 --num-ctx 16384` to rebuild `output.csv` from real model extractions across all ten pages.
+- Kept the hand-verified table 4.1 prototype backed up before clearing `output.csv`, since the local 3B model is less accurate than the manual transcription for that one page.
+
+## 38. Memory-Safe Context Settings (8GB Machine)
+- Problem: after raising the context window, the first full run crashed with `unexpected EOF (status code: 500)` partway through image 1. This was not a parsing error; it was the model runtime dying.
+- Diagnosis: a 16384-token context plus an 8192-token response reserve is too much key/value cache to hold next to the model on an 8GB machine, so the runner was killed under memory pressure.
+- Method that fixed it: dialed the settings down to a window that fits in memory but is still far larger than the old 4096 default — `--num-ctx 8192 --num-predict 6144 --max-image-side 1100`. Smaller resized images also cut the image-token cost, leaving more of the window for the response.
+- Lesson recorded: on this machine, context window and response length are a memory budget, not just a quality knob. 8192 is the safe ceiling for these tables.
+
+## 39. Handling The Different Table Layouts On Pages 6-8
+- Once the pages actually parsed, the next issue was that pages 6, 7, and 8 are not simple single-block tables like 4.1, so a naive single-pass read mis-aligned columns.
+- Table 4.6: two separate sub-tables stacked on one page (different alliances), each printed as two side-by-side species panels that share the same releve columns. Method: treat the page as two logical sub-tables, and read each panel as a continuation of the same releve columns rather than as new columns.
+- Table 4.7: twelve releve columns split into two subassociations, each with its own constancy (C) and mean (D) summary columns. Method: split the page by subassociation (releves 1-6 and 7-12) so each observation inherits the correct C/D pair.
+- Table 4.8: a wide table rotated 90 degrees with ~36 releve columns. Method: rotate to landscape first; flagged as needing a dedicated verification pass because column count and rotation make a single read unreliable.
+- General rule applied: carry table metadata and releve column order forward from the page that printed the headers, and verify the per-releve "total number of species" row as a cross-check on column alignment.
+
+## 40. Chronological Output Ordering
+- Problem: rows could land in `output.csv` in whatever order pages were processed, leaving the file non-chronological and hard to scan.
+- Method that fixed it: sort `output/output.csv` by source image number with a stable sort, so all of image `_5` precedes image `_6`, while each image keeps its natural table/species row order.
+- Added a matching rule to `instructions.md` so future runs keep `output.csv` ordered by image number. 
