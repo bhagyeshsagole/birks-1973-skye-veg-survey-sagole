@@ -199,6 +199,36 @@ Why this matters:
 - It highlights special source marks such as `*Parmelia glabratula`.
 - It gives a clean place for later taxonomic authority validation.
 
+## `output/processed_images.json`
+
+This is the durable resume file for unattended extraction.
+
+Each image record stores:
+
+- `status`: the latest action, such as `success`, `failed`, or `skipped`.
+- `result_status`: the last real extraction result, even after a resume skip.
+- `timestamp`: when the record was last updated.
+- `error_message`: the failure reason when extraction failed.
+- `skip_reason`: why an image was skipped.
+- `output_row_counts`: how many table, plot, and observation rows were produced.
+
+The script checks this file when `--resume` is used. Successful images are not
+repeated. Failed images are also skipped unless `--retry-failed` is supplied.
+
+## `output/failed_images.csv`
+
+This is the dedicated history of failed extraction attempts.
+
+Its columns are:
+
+- `filename`
+- `error_type`
+- `error_message`
+- `timestamp`
+
+Keeping failures here prevents error placeholders from being mixed into the
+scientific species observation rows in `output/output.csv`.
+
 ## How The Files Connect
 
 The current tidy structure is:

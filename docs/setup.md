@@ -154,35 +154,43 @@ The `images/` folder is ignored by git. Do not commit raw scans.
 
 ## Current Preferred Parse Command
 
-Run a small test first:
+Run a three-image test first:
 
 ```bash
-python3 scripts/parse_images.py --limit 5 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
 ```
 
 On Windows, if `python3` does not work, use:
 
 ```powershell
-py scripts/parse_images.py --limit 5 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+py scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
 ```
 
 What this command does:
 
-- Reads the first 5 images from `images/`.
+- Selects the first 3 images from `images/` for a safe test.
 - Uses natural numeric sorting so image 2 comes before image 10.
 - Sends one image at a time to `qwen2.5vl:3b`.
 - Uses `prompts/csv_parsing_instructions.md` as the extraction prompt.
 - Resizes a temporary copy of large images to a maximum side of 1000 pixels.
 - Allows a longer model response with `--num-predict 8192`.
-- Writes tidy CSV outputs.
+- Saves CSV output, status, and failure logs after every image.
+- Skips images already marked successful or failed when `--resume` is used.
 
-To continue with the next 10 images after the first 5, use:
+After checking the three-image output, process all remaining images:
 
 ```bash
-python3 scripts/parse_images.py --resume --skip 5 --limit 10 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --resume --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
 ```
 
-`--skip 5` skips images 1-5, and `--limit 10` processes images 6-15.
+You can stop this command and run the same command later. `--resume` reads
+`output/processed_images.json` and continues without repeating completed work.
+
+To explicitly retry images that previously failed, run:
+
+```bash
+python3 scripts/parse_images.py --resume --retry-failed --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+```
 
 ## Output Files
 
@@ -192,7 +200,14 @@ After a successful tidy run, check:
 output/output.csv
 output/plots.csv
 output/tables.csv
+output/processed_images.json
+output/failed_images.csv
 ```
+
+`processed_images.json` stores each image's latest action, last extraction
+result, timestamp, error message, and output row counts. `failed_images.csv`
+stores a reviewable history of failed extraction attempts. Failures are no
+longer inserted into the scientific observation CSV as `PARSE_ERROR` rows.
 
 ### `output/output.csv`
 
@@ -295,10 +310,10 @@ The script asks for the Drive folder link and downloads files into `images/`.
 1. Start Ollama.
 2. Activate the Python environment.
 3. Put images in `images/`.
-4. Run a small `--limit 5` test.
-5. Inspect `output/output.csv`, `output/plots.csv`, and `output/tables.csv`.
+4. Run a small `--resume --limit 3` test.
+5. Inspect the three scientific CSVs plus the status and failure files.
 6. Fix prompts or code if the output is wrong.
-7. Only then run a larger batch.
+7. Run the full `--resume` command and leave it working locally.
 
 ## Common Problems
 

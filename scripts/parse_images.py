@@ -23,6 +23,7 @@ import json
 import math
 import re
 import tempfile
+from datetime import datetime, timezone
 from io import StringIO
 from json import JSONDecodeError
 from pathlib import Path
@@ -31,7 +32,6 @@ from typing import Any
 import ollama
 import pandas as pd
 from PIL import Image
-from tqdm import tqdm
 
 
 # These defaults let the script run without typing long paths every time.
@@ -41,6 +41,8 @@ DEFAULT_IMAGES_DIR = Path("images")
 DEFAULT_OUTPUT_PATH = Path("output/output.csv")
 DEFAULT_PLOTS_OUTPUT_PATH = Path("output/plots.csv")
 DEFAULT_TABLES_OUTPUT_PATH = Path("output/tables.csv")
+DEFAULT_STATUS_PATH = Path("output/processed_images.json")
+DEFAULT_FAILED_OUTPUT_PATH = Path("output/failed_images.csv")
 DEFAULT_PROMPT_FILE = Path("prompts/csv_parsing_instructions.md")
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
@@ -122,6 +124,14 @@ TABLE_COLUMNS = [
     "notes",
 ]
 
+# A separate failure file keeps errors out of the scientific observation data.
+FAILURE_COLUMNS = [
+    "filename",
+    "error_type",
+    "error_message",
+    "timestamp",
+]
+
 # Columns for the older printed-table reconstruction mode.
 # This keeps the visual table shape but is less useful for analysis.
 TABLE_OUTPUT_COLUMNS = [
@@ -192,6 +202,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--plots-output", type=Path, default=DEFAULT_PLOTS_OUTPUT_PATH)
     parser.add_argument("--tables-output", type=Path, default=DEFAULT_TABLES_OUTPUT_PATH)
+    parser.add_argument("--status-file", type=Path, default=DEFAULT_STATUS_PATH)
+    parser.add_argument("--failed-output", type=Path, default=DEFAULT_FAILED_OUTPUT_PATH)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument(
         "--mode",
@@ -205,7 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROMPT_FILE,
         help="Prompt file used in tidy and table modes.",
     )
-    parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=50,
+        help="Retained for command compatibility. Durable runs now save after every image.",
+    )
     parser.add_argument(
         "--skip",
         type=int,
@@ -214,6 +231,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="With --resume, retry images whose previous extraction attempt failed.",
+    )
     parser.add_argument("--keep-raw", action="store_true")
     parser.add_argument(
         "--max-image-side",
@@ -838,10 +860,11 @@ def load_existing_rows(output_path: Path, columns: list[str]) -> pd.DataFrame:
 
 
 def save_rows(rows: list[dict[str, str]], output_path: Path, columns: list[str]) -> None:
-    """Save rows to CSV in a stable column order.
+    """Atomically save rows to CSV in a stable column order.
 
     Stable column order keeps the output easy to compare in git and easy to
-    read in spreadsheet tools.
+    read in spreadsheet tools. Writing a temporary file first prevents a crash
+    during saving from leaving a half-written CSV.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(rows)
@@ -849,46 +872,168 @@ def save_rows(rows: list[dict[str, str]], output_path: Path, columns: list[str])
         if column not in frame.columns:
             frame[column] = ""
     frame = frame[columns]
-    frame.to_csv(output_path, index=False)
+    temporary_path = output_path.with_name(f".{output_path.name}.tmp")
+    frame.to_csv(temporary_path, index=False)
+    temporary_path.replace(output_path)
 
 
-def error_observation(image_path: Path, error: Exception) -> dict[str, str]:
-    """Create a reviewable output row when one image fails to parse."""
-    return {
-        "table_id": image_path.stem,
-        "image_file": str(image_path),
-        "class": "",
-        "order": "",
-        "alliance": "",
-        "association": "",
-        "releve_id": "",
-        "ref_code": "",
-        "map_reference": "",
-        "os_grid_square": "",
-        "os_grid_reference": "",
-        "easting": "",
-        "northing": "",
-        "latitude": "",
-        "longitude": "",
-        "altitude_ft": "",
-        "altitude_m": "",
-        "aspect_deg": "",
-        "slope_deg": "",
-        "cover_pct": "",
-        "plot_area_m2": "",
-        "species_reported": "",
-        "species": "PARSE_ERROR",
-        "domin_value": "",
-        "domin_cover_min_pct": "",
-        "domin_cover_max_pct": "",
-        "presence_binary": "",
-        "raw_value": "",
-        "constancy_class": "",
-        "summary_value": "",
-        "total_species_reported": "",
-        "needs_review": "true",
-        "note": str(error),
+def utc_timestamp() -> str:
+    """Return a timezone-aware timestamp suitable for logs and JSON files."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def empty_status_data() -> dict[str, Any]:
+    """Create the top-level structure used by processed_images.json."""
+    return {"version": 1, "images": {}}
+
+
+def load_status_data(status_path: Path, resume: bool) -> dict[str, Any]:
+    """Load durable image statuses, or start a fresh status file.
+
+    A non-resume run intentionally starts fresh. A resume run validates the
+    existing JSON so damaged state is reported instead of silently ignored.
+    """
+    if not resume or not status_path.exists():
+        return empty_status_data()
+
+    with status_path.open(encoding="utf-8") as status_file:
+        data = json.load(status_file)
+    if not isinstance(data, dict) or not isinstance(data.get("images"), dict):
+        raise ValueError(f"Invalid status file structure: {status_path}")
+    return data
+
+
+def save_status_data(status_data: dict[str, Any], status_path: Path) -> None:
+    """Atomically save processed image status so resume data remains valid."""
+    status_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = status_path.with_name(f".{status_path.name}.tmp")
+    with temporary_path.open("w", encoding="utf-8") as status_file:
+        json.dump(status_data, status_file, indent=2, ensure_ascii=False, sort_keys=True)
+        status_file.write("\n")
+    temporary_path.replace(status_path)
+
+
+def status_record(status_data: dict[str, Any], image_path: Path) -> dict[str, Any]:
+    """Return one image's saved status record, or an empty record."""
+    record = status_data["images"].get(str(image_path), {})
+    return record if isinstance(record, dict) else {}
+
+
+def previous_result(record: dict[str, Any]) -> str:
+    """Return the last extraction result even if the latest action was skipped."""
+    result = record.get("result_status")
+    if result in {"success", "failed"}:
+        return result
+    status = record.get("status")
+    return status if status in {"success", "failed"} else ""
+
+
+def skip_reason(record: dict[str, Any], retry_failed: bool) -> str:
+    """Explain why resume should skip an image, or return an empty string."""
+    result = previous_result(record)
+    if result == "success":
+        return "already successful"
+    if result == "failed" and not retry_failed:
+        return "previously failed; use --retry-failed to retry"
+    return ""
+
+
+def update_status(
+    status_data: dict[str, Any],
+    image_path: Path,
+    status: str,
+    *,
+    error_message: str = "",
+    output_row_counts: dict[str, int] | None = None,
+    reason: str = "",
+) -> None:
+    """Record the latest action and preserve the last real extraction result.
+
+    The visible status can be success, failed, or skipped. result_status keeps
+    the last actual extraction outcome, so marking an already successful image
+    as skipped does not make a later resume accidentally process it again.
+    """
+    old_record = status_record(status_data, image_path)
+    result_status = previous_result(old_record)
+    if status in {"success", "failed"}:
+        result_status = status
+
+    if status == "skipped" and not error_message:
+        error_message = str(old_record.get("error_message", ""))
+
+    status_data["images"][str(image_path)] = {
+        "filename": str(image_path),
+        "status": status,
+        "result_status": result_status,
+        "timestamp": utc_timestamp(),
+        "error_message": error_message,
+        "skip_reason": reason,
+        "output_row_counts": output_row_counts or old_record.get("output_row_counts", {}),
     }
+
+
+def append_failure(
+    failure_rows: list[dict[str, str]], image_path: Path, error: Exception
+) -> None:
+    """Append one failed extraction attempt to failed_images.csv data."""
+    failure_rows.append(
+        {
+            "filename": str(image_path),
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+            "timestamp": utc_timestamp(),
+        }
+    )
+
+
+def record_command_skips(status_data: dict[str, Any], args: argparse.Namespace) -> int:
+    """Record images deliberately excluded by --skip without marking them done.
+
+    Their visible status is skipped, but result_status remains empty unless an
+    earlier run actually succeeded or failed. A later full resume can therefore
+    still process an image that was only excluded by command selection.
+    """
+    for image_path in args.explicitly_skipped:
+        reason = "excluded by --skip"
+        update_status(status_data, image_path, "skipped", reason=reason)
+        print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
+    return len(args.explicitly_skipped)
+
+
+def save_tidy_outputs(
+    args: argparse.Namespace,
+    observation_rows: list[dict[str, str]],
+    plot_rows: list[dict[str, str]],
+    table_rows: list[dict[str, str]],
+    status_data: dict[str, Any],
+    failure_rows: list[dict[str, str]],
+) -> None:
+    """Save all tidy CSVs, statuses, and failures after one image."""
+    save_rows(observation_rows, args.output, OBSERVATION_COLUMNS)
+    save_rows(plot_rows, args.plots_output, PLOT_COLUMNS)
+    save_rows(table_rows, args.tables_output, TABLE_COLUMNS)
+    save_status_data(status_data, args.status_file)
+    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+
+
+def print_run_summary(
+    args: argparse.Namespace,
+    successful: int,
+    skipped: int,
+    failed: int,
+) -> None:
+    """Print the counts and files needed to review or resume the run."""
+    print("\nRun summary")
+    print(f"Total images found: {args.total_images_found}")
+    print(f"Processed successfully: {successful}")
+    print(f"Skipped: {skipped}")
+    print(f"Failed: {failed}")
+    print(f"Observations: {args.output}")
+    if args.mode == "tidy":
+        print(f"Plots: {args.plots_output}")
+        print(f"Tables: {args.tables_output}")
+    print(f"Status: {args.status_file}")
+    print(f"Failures: {args.failed_output}")
 
 
 def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
@@ -917,15 +1062,74 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
         if args.resume
         else []
     )
-    completed = {
-        row["image_file"]
-        for row in table_rows
-        if row.get("image_file")
-    } if args.resume else set()
+    status_data = load_status_data(args.status_file, args.resume)
+    failure_rows = (
+        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
+        if args.resume
+        else []
+    )
+    successful = 0
+    failed = 0
 
-    pending_images = [image for image in images if str(image) not in completed]
-    for index, image_path in enumerate(tqdm(pending_images, desc="Parsing images"), start=1):
+    # If this is the first run with a status file, import successful image paths
+    # from tables.csv so older resume data still protects completed work.
+    if args.resume:
+        for row in table_rows:
+            image_file = row.get("image_file", "")
+            if (
+                image_file
+                and Path(image_file).exists()
+                and image_file not in status_data["images"]
+            ):
+                update_status(status_data, Path(image_file), "success")
+
+    skipped = record_command_skips(status_data, args)
+
+    save_tidy_outputs(
+        args,
+        observation_rows,
+        plot_rows,
+        table_rows,
+        status_data,
+        failure_rows,
+    )
+
+    for image_path in images:
+        position = args.image_positions[str(image_path)]
+        record = status_record(status_data, image_path)
+        reason = skip_reason(record, args.retry_failed) if args.resume else ""
+        if reason:
+            skipped += 1
+            update_status(status_data, image_path, "skipped", reason=reason)
+            save_tidy_outputs(
+                args,
+                observation_rows,
+                plot_rows,
+                table_rows,
+                status_data,
+                failure_rows,
+            )
+            print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
+            continue
+
+        print(
+            f"Processing {position}/{args.total_images_found}: {image_path.name}",
+            flush=True,
+        )
         try:
+            # Remove this image's old rows before a retry. This prevents
+            # duplicates if a previous run saved CSVs but stopped before its
+            # success status reached processed_images.json.
+            image_name = str(image_path)
+            observation_rows = [
+                row for row in observation_rows if row.get("image_file") != image_name
+            ]
+            plot_rows = [
+                row for row in plot_rows if row.get("image_file") != image_name
+            ]
+            table_rows = [
+                row for row in table_rows if row.get("image_file") != image_name
+            ]
             image_tables, image_plots, image_observations = parse_tidy_image(
                 image_path,
                 args.model,
@@ -936,24 +1140,44 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
             table_rows.extend(image_tables)
             plot_rows.extend(image_plots)
             observation_rows.extend(image_observations)
+            successful += 1
+            update_status(
+                status_data,
+                image_path,
+                "success",
+                output_row_counts={
+                    "observations": len(image_observations),
+                    "plots": len(image_plots),
+                    "tables": len(image_tables),
+                },
+            )
+            print(f"SUCCESS: {image_path.name}", flush=True)
         except Exception as error:
-            # Keep going when one image fails. The error row tells us what to review.
-            observation_rows.append(error_observation(image_path, error))
+            failed += 1
+            append_failure(failure_rows, image_path, error)
+            update_status(status_data, image_path, "failed", error_message=str(error))
+            print(f"FAILED: {image_path.name} - {error}", flush=True)
 
-        # Batch saving protects progress during long runs.
-        if index % args.batch_size == 0:
-            save_rows(observation_rows, args.output, OBSERVATION_COLUMNS) # type: ignore
-            save_rows(plot_rows, args.plots_output, PLOT_COLUMNS) # type: ignore
-            save_rows(table_rows, args.tables_output, TABLE_COLUMNS) # type: ignore
+        # Saving every image makes interruption recovery independent of batch size.
+        save_tidy_outputs(
+            args,
+            observation_rows,
+            plot_rows,
+            table_rows,
+            status_data,
+            failure_rows,
+        )
 
-    save_rows(observation_rows, args.output, OBSERVATION_COLUMNS)
-    save_rows(plot_rows, args.plots_output, PLOT_COLUMNS)
-    save_rows(table_rows, args.tables_output, TABLE_COLUMNS)
-    print(
-        f"Wrote {len(observation_rows)} observations to {args.output}, "
-        f"{len(plot_rows)} plots to {args.plots_output}, "
-        f"and {len(table_rows)} tables to {args.tables_output}."
+    # Create all state files even when every selected image was skipped.
+    save_tidy_outputs(
+        args,
+        observation_rows,
+        plot_rows,
+        table_rows,
+        status_data,
+        failure_rows,
     )
+    print_run_summary(args, successful, skipped, failed)
 
 
 def run_table_mode(args: argparse.Namespace, images: list[Path]) -> None:
@@ -964,40 +1188,71 @@ def run_table_mode(args: argparse.Namespace, images: list[Path]) -> None:
         if args.resume
         else []
     )
-
-    for index, image_path in enumerate(tqdm(images, desc="Parsing images"), start=1):
-        try:
-            rows.extend(
-                parse_table_image(
-                    image_path,
-                    args.model,
-                    prompt,
-                    args.max_image_side,
-                    args.num_predict,
-                )
-            )
-        except Exception as error:
-            # Store parse errors in the CSV so a bad page does not stop the batch.
-            rows.append(
-                {
-                    "row_label": f"Parse error: {image_path.name}",
-                    "plot_1": str(error),
-                    "plot_2": "",
-                    "plot_3": "",
-                    "plot_4": "",
-                    "plot_5": "",
-                    "plot_6": "",
-                    "plot_7": "",
-                    "C": "",
-                    "D": "",
-                }
-            )
-
-        if index % args.batch_size == 0:
-            save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
+    status_data = load_status_data(args.status_file, args.resume)
+    failure_rows = (
+        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
+        if args.resume
+        else []
+    )
+    successful = 0
+    failed = 0
+    skipped = record_command_skips(status_data, args)
 
     save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
-    print(f"Wrote {len(rows)} rows to {args.output}.")
+    save_status_data(status_data, args.status_file)
+    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+
+    for image_path in images:
+        position = args.image_positions[str(image_path)]
+        reason = (
+            skip_reason(status_record(status_data, image_path), args.retry_failed)
+            if args.resume
+            else ""
+        )
+        if reason:
+            skipped += 1
+            update_status(status_data, image_path, "skipped", reason=reason)
+            save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
+            save_status_data(status_data, args.status_file)
+            save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+            print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
+            continue
+
+        print(
+            f"Processing {position}/{args.total_images_found}: {image_path.name}",
+            flush=True,
+        )
+        try:
+            image_rows = parse_table_image(
+                image_path,
+                args.model,
+                prompt,
+                args.max_image_side,
+                args.num_predict,
+            )
+            rows.extend(image_rows)
+            successful += 1
+            update_status(
+                status_data,
+                image_path,
+                "success",
+                output_row_counts={"table_rows": len(image_rows)},
+            )
+            print(f"SUCCESS: {image_path.name}", flush=True)
+        except Exception as error:
+            failed += 1
+            append_failure(failure_rows, image_path, error)
+            update_status(status_data, image_path, "failed", error_message=str(error))
+            print(f"FAILED: {image_path.name} - {error}", flush=True)
+
+        save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
+        save_status_data(status_data, args.status_file)
+        save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+
+    save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
+    save_status_data(status_data, args.status_file)
+    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+    print_run_summary(args, successful, skipped, failed)
 
 
 def run_json_mode(args: argparse.Namespace, images: list[Path]) -> None:
@@ -1008,49 +1263,96 @@ def run_json_mode(args: argparse.Namespace, images: list[Path]) -> None:
         else pd.DataFrame(columns=JSON_OUTPUT_COLUMNS)
     )
     rows = existing_frame.to_dict("records")
-    completed = set(existing_frame["image_file"]) if args.resume else set()
-    pending_images = [image for image in images if str(image) not in completed]
+    status_data = load_status_data(args.status_file, args.resume)
+    failure_rows = (
+        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
+        if args.resume
+        else []
+    )
+    successful = 0
+    failed = 0
 
-    for index, image_path in enumerate(tqdm(pending_images, desc="Parsing images"), start=1):
-        try:
-            rows.append(
-                parse_json_image(
-                    image_path,
-                    args.model,
-                    args.keep_raw,
-                    args.max_image_side,
-                    args.num_predict,
-                )
-            )
-        except Exception as error:
-            # Store the error next to the image filename for later review.
-            rows.append(
-                {
-                    "image_file": str(image_path),
-                    "species_name": "",
-                    "location": "",
-                    "coordinates": "",
-                    "date": "",
-                    "collector": "",
-                    "notes": "",
-                    "other_visible_fields": "",
-                    "parse_status": "error",
-                    "parse_error": str(error),
-                    "raw_response": "",
-                }
-            )
+    if args.resume:
+        for row in rows:
+            if (
+                row.get("parse_status") == "ok"
+                and row.get("image_file")
+                and row["image_file"] not in status_data["images"]
+            ):
+                update_status(status_data, Path(row["image_file"]), "success")
 
-        if index % args.batch_size == 0:
-            save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
+    skipped = record_command_skips(status_data, args)
 
     save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
-    print(f"Wrote {len(rows)} rows to {args.output}.")
+    save_status_data(status_data, args.status_file)
+    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+
+    for image_path in images:
+        position = args.image_positions[str(image_path)]
+        reason = (
+            skip_reason(status_record(status_data, image_path), args.retry_failed)
+            if args.resume
+            else ""
+        )
+        if reason:
+            skipped += 1
+            update_status(status_data, image_path, "skipped", reason=reason)
+            save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
+            save_status_data(status_data, args.status_file)
+            save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+            print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
+            continue
+
+        print(
+            f"Processing {position}/{args.total_images_found}: {image_path.name}",
+            flush=True,
+        )
+        try:
+            image_name = str(image_path)
+            rows = [row for row in rows if row.get("image_file") != image_name]
+            image_row = parse_json_image(
+                image_path,
+                args.model,
+                args.keep_raw,
+                args.max_image_side,
+                args.num_predict,
+            )
+            rows.append(image_row)
+            successful += 1
+            update_status(
+                status_data,
+                image_path,
+                "success",
+                output_row_counts={"json_rows": 1},
+            )
+            print(f"SUCCESS: {image_path.name}", flush=True)
+        except Exception as error:
+            failed += 1
+            append_failure(failure_rows, image_path, error)
+            update_status(status_data, image_path, "failed", error_message=str(error))
+            print(f"FAILED: {image_path.name} - {error}", flush=True)
+
+        save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
+        save_status_data(status_data, args.status_file)
+        save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+
+    save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
+    save_status_data(status_data, args.status_file)
+    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+    print_run_summary(args, successful, skipped, failed)
 
 
 def main() -> None:
     """Read command-line arguments, find images, and dispatch to one mode."""
     args = build_parser().parse_args()
-    images = find_images(args.images_dir)
+    all_images = find_images(args.images_dir)
+    args.total_images_found = len(all_images)
+    args.image_positions = {
+        str(image_path): index
+        for index, image_path in enumerate(all_images, start=1)
+    }
+    args.explicitly_skipped = all_images[: args.skip] if args.skip else []
+    images = all_images
     if args.skip:
         images = images[args.skip :]
     if args.limit is not None:

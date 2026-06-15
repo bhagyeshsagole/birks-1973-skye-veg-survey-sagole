@@ -236,3 +236,7 @@
 ## 31. Unattended Pipeline Audit
 - Audited the current Ollama image pipeline, including its model, prompt, input/output paths, dependencies, batching, progress display, and resume behavior.
 - Confirmed the parser already runs images sequentially without Codex; identified durable success/failure tracking and clearer logging as the main remaining automation work.
+
+## 32. Durable Unattended Parsing
+- Added per-image JSON status, a dedicated failure CSV, resume/retry controls, atomic saves after every image, clear terminal messages, and a final run summary.
+- Updated setup commands for a three-image test, full resume run, and explicit failed-image retries; ignored local Python virtual-environment folders.

@@ -60,10 +60,10 @@ ollama pull qwen2.5:3b
 
 Put raw scans in `images/`. That folder and common image extensions are ignored by git.
 
-Run tidy extraction first:
+Run a safe three-image tidy extraction test first:
 
 ```bash
-python3 scripts/parse_images.py --limit 5 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
 ```
 
 This reads supported images from `images/`, sends one image at a time to `qwen2.5vl:3b`, uses `prompts/csv_parsing_instructions.md`, and writes tidy CSV outputs:
@@ -71,8 +71,27 @@ This reads supported images from `images/`, sends one image at a time to `qwen2.
 - `output/output.csv` for long-format species observations
 - `output/plots.csv` for plot/releve metadata, including British National Grid references, easting/northing, and latitude/longitude fields when available
 - `output/tables.csv` for table-level metadata
+- `output/processed_images.json` for durable success, failure, and skip status
+- `output/failed_images.csv` for error type, message, and timestamp
 
-`--max-image-side` makes a temporary resized copy for Ollama without changing the original scan. `--num-predict` caps the model response length.
+The script saves all output and state files after every image. `--resume` skips
+previously successful and failed images, so the same command can safely be run
+again after an interruption. Use `--retry-failed` when failed images should be
+attempted again.
+
+After reviewing the three-image test, process all remaining images:
+
+```bash
+python3 scripts/parse_images.py --resume --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+```
+
+Retry only the failed images while continuing to skip successful images:
+
+```bash
+python3 scripts/parse_images.py --resume --retry-failed --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+```
+
+`--max-image-side` makes a temporary resized copy for Ollama without changing the original scan. `--num-predict` caps the model response length. `--batch-size` remains accepted for compatibility, but durable runs save after every image.
 
 `output/output_validated.csv` is currently a species-level format-check/review file built from `output/output.csv`.
 
