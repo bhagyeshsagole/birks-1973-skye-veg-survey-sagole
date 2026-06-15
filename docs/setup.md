@@ -249,21 +249,22 @@ Use this for:
 
 ## Validation Status
 
-`scripts/validate_names.py` currently belongs to the older specimen-name workflow.
+`output/output_validated.csv` is now a species-level review file built from the current tidy `species` column.
 
-The older validation command is:
-
-```bash
-python3 scripts/validate_names.py --resume --batch-size 50
-```
-
-But the preferred tidy output stores species names in:
+Current meaning:
 
 ```text
-output/output.csv -> species
+one row per unique species name
 ```
 
-So future validation should be redesigned to validate the `species` column in `output/output.csv`.
+It currently performs a simple format check:
+
+- full binomial-looking names are marked lower risk
+- abbreviated genus names are flagged
+- names with source marks such as `*` are flagged
+- final taxonomic authority validation is still a future cleaning step
+
+`scripts/validate_names.py` still belongs to the older specimen-name workflow and should not be treated as the final tidy species validator yet.
 
 ## Optional Google Drive Download
 

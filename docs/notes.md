@@ -160,24 +160,44 @@ Why this matters:
 
 ## `output/output_validated.csv`
 
-This is older validation output from the first parser design.
+This is the species-name review file for the current tidy output.
 
 Current shape:
 
-- 5 rows
-- 18 columns
+- 25 rows
+- 10 columns
 
-This file came from the earlier specimen-label workflow, where the parser tried to extract one `species_name` per image.
+Each row means:
 
-That approach is not the current target because these scans are vegetation tables with many species across many plots.
+```text
+one unique species name from output/output.csv
+```
+
+Important columns:
+
+- `table_id`: table where the species appears.
+- `species`: species name as currently stored in `output/output.csv`.
+- `corrected_species`: current corrected/review name. At this stage it matches `species`.
+- `validation_status`: current review status.
+- `confidence`: simple format-check confidence.
+- `flag`: `true` means the name needs human review.
+- `note`: why the row is flagged or what kind of check was done.
+- `observations_count`: number of observation rows for that species.
+- `present_count`: number of plots where that species is present.
+- `domin_values_seen`: Domin values or presence/absence symbols seen for that species.
 
 Current status:
 
 ```text
-output_validated.csv is legacy test output
+output_validated.csv is a format-check species review file, not a final taxonomic authority validation.
 ```
 
-Later, validation should probably be redesigned to validate the `species` column in `output/output.csv`.
+Why this matters:
+
+- It separates species-name review from plot-by-plot observations.
+- It highlights abbreviated names such as `R. heterostichum`.
+- It highlights special source marks such as `*Parmelia glabratula`.
+- It gives a clean place for later taxonomic authority validation.
 
 ## How The Files Connect
 

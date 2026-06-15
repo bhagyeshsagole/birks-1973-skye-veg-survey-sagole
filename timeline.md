@@ -204,7 +204,7 @@
 
 ## 25. Output CSV Explanation
 - Reviewed `output/output.csv`, `output/plots.csv`, `output/tables.csv`, and `output/output_validated.csv`.
-- Explained how each file maps to the vegetation survey project: table metadata, plot metadata, long-format species observations, and legacy validation output.
+- Explained how each file maps to the vegetation survey project: table metadata, plot metadata, long-format species observations, and species review output.
 
 ## 26. Notes And Setup Docs
 - Added `docs/notes.md` with a plain-English explanation of all output CSV files and how they connect to the research project.
@@ -227,3 +227,8 @@
 - Converted British National Grid easting/northing to WGS84 `latitude` and `longitude` offline in the parser.
 - Added Domin cover range columns: `domin_cover_min_pct` and `domin_cover_max_pct`.
 - Current CSVs after review fixes: `output/output.csv` is 175 rows by 33 columns, and `output/plots.csv` is 7 rows by 20 columns.
+
+## 30. Existing CSV Cleanup
+- Replaced the old 5-row specimen-label `output/output_validated.csv` with a current tidy species review file.
+- New `output/output_validated.csv` has 25 rows, one per unique species name, with format-check status, review flags, observation counts, present counts, and Domin values seen.
+- Updated docs so `output_validated.csv` is no longer described as legacy parser output.

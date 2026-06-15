@@ -74,13 +74,15 @@ This reads supported images from `images/`, sends one image at a time to `qwen2.
 
 `--max-image-side` makes a temporary resized copy for Ollama without changing the original scan. `--num-predict` caps the model response length.
 
+`output/output_validated.csv` is currently a species-level format-check/review file built from `output/output.csv`.
+
 The older species-name validation script is still available, but it was built for the earlier specimen-label workflow:
 
 ```bash
 python3 scripts/validate_names.py --resume --batch-size 50
 ```
 
-Future validation should target the `species` column in `output/output.csv`.
+Future model-backed validation should target the `species` column in `output/output.csv`.
 
 Do not run `scripts/parse_images.py` and `scripts/validate_names.py` at the same time on the 8GB MacBook Air. Running them separately avoids loading both Ollama models together.
 
