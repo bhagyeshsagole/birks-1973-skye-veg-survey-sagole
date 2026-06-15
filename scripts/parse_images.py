@@ -206,6 +206,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Prompt file used in tidy and table modes.",
     )
     parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument(
+        "--skip",
+        type=int,
+        default=0,
+        help="Skip this many naturally sorted images before applying --limit. Example: --skip 5 --limit 10 parses images 6-15.",
+    )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--keep-raw", action="store_true")
@@ -1045,6 +1051,8 @@ def main() -> None:
     """Read command-line arguments, find images, and dispatch to one mode."""
     args = build_parser().parse_args()
     images = find_images(args.images_dir)
+    if args.skip:
+        images = images[args.skip :]
     if args.limit is not None:
         images = images[: args.limit]
 

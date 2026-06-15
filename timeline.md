@@ -232,3 +232,7 @@
 - Replaced the old 5-row specimen-label `output/output_validated.csv` with a current tidy species review file.
 - New `output/output_validated.csv` has 25 rows, one per unique species name, with format-check status, review flags, observation counts, present counts, and Domin values seen.
 - Updated docs so `output_validated.csv` is no longer described as legacy parser output.
+
+## 31. Unattended Pipeline Audit
+- Audited the current Ollama image pipeline, including its model, prompt, input/output paths, dependencies, batching, progress display, and resume behavior.
+- Confirmed the parser already runs images sequentially without Codex; identified durable success/failure tracking and clearer logging as the main remaining automation work.

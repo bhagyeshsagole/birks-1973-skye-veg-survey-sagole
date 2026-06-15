@@ -176,6 +176,14 @@ What this command does:
 - Allows a longer model response with `--num-predict 8192`.
 - Writes tidy CSV outputs.
 
+To continue with the next 10 images after the first 5, use:
+
+```bash
+python3 scripts/parse_images.py --resume --skip 5 --limit 10 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+```
+
+`--skip 5` skips images 1-5, and `--limit 10` processes images 6-15.
+
 ## Output Files
 
 After a successful tidy run, check:
