@@ -116,6 +116,10 @@ def main() -> None:
     images = P.find_images(Path("images"))
     # Image 8 (table 4.8) is the rotated 26-releve page; transcribed but kept flagged.
     flagged = {8}
+    image_notes = {
+        13: "Transcribed from scan; table 4.13 releve 5 printed total is one higher than visible entries.",
+        15: "Transcribed from scan; chemistry-only Table 4.16 not included in species output.",
+    }
     tracking_rows = []
     for idx, img in enumerate(images, start=1):
         image_file = str(img)
@@ -125,7 +129,7 @@ def main() -> None:
         elif n_obs and idx in flagged:
             status, note = "successful", "Transcribed from scan; rotated multi-column page, some cells flagged for review."
         elif n_obs:
-            status, note = "successful", "Transcribed from scan."
+            status, note = "successful", image_notes.get(idx, "Transcribed from scan.")
         else:
             status, note = "pending", ""
         tracking_rows.append({

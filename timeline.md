@@ -289,4 +289,27 @@
 ## 40. Chronological Output Ordering
 - Problem: rows could land in `output.csv` in whatever order pages were processed, leaving the file non-chronological and hard to scan.
 - Method that fixed it: sort `output/output.csv` by source image number with a stable sort, so all of image `_5` precedes image `_6`, while each image keeps its natural table/species row order.
-- Added a matching rule to `instructions.md` so future runs keep `output.csv` ordered by image number. 
+- Added a matching rule to `instructions.md` so future runs keep `output.csv` ordered by image number.
+
+## 41. Scaling From First Setup To Full Batches
+- The parsing worked on the first setup and the initial images, but pushing it onto larger batches exposed several layout problems that single images had hidden.
+- Two root problems drove most failures: how the page was cropped, and how tables that continue across pages were understood.
+- Cropping problem: to save effort the input had been limited to the cropped table region. That held up for simple layouts but broke whenever table content sat outside the expected crop (tables or partial content in unexpected parts of the page). Fix: parse the full page instead of only the cropped table region.
+- Continuation problem: one page would carry the table title and column headers and the next page would continue the same table with no headers repeated. The reader only turned image content into text and kept too little context, so it flagged the continuation page for review instead of recognizing it as the same table. Fix: carry header/column context forward so a headerless page is read as a continuation.
+
+## 42. Improvements From Studying Stronger Systems
+- Debugged the batch failures directly; several attempted fixes still failed on edge cases, so studied how stronger image-recognition systems handle the same problems.
+- Key insight: robust parsing never depends on a single attempt. It retries with different crops, resized copies, higher-resolution inputs, and added context until the output is reliable.
+- Changes applied to the pipeline:
+  - Full-page image parsing instead of crop-only input.
+  - Better automatic resize and crop logic.
+  - Retry path for difficult images instead of failing immediately.
+  - Context handling for tables that span multiple pages.
+  - Review logic for genuinely uncertain or irregular cases only.
+  - Stronger batch workflow that tolerates a wider range of real document layouts.
+
+## 43. Stability And Performance After The Fixes
+- The image set had many layout inconsistencies: some pages parsed easily, others needed several adjustments and verification.
+- Before the fixes the run failed every few images; after them it became stable and processed more than 25 images in a row without errors.
+- Per-image time depends on the device and the page complexity: roughly 2.5 minutes on one machine and about 48 seconds on another for comparable pages.
+- The image-data parsing stage is now complete and noticeably more robust, leaving the project ready to move on to the data-analysis stage. 
