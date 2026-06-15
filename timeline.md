@@ -244,3 +244,15 @@
 ## 33. Full Batch Stopped
 - Started the 96-image unattended run and stopped it immediately when requested.
 - Saved result: 0 successful, 1 failed; image 2 was interrupted before status saving and remains available for resume.
+
+## 34. Simplified Output Folder
+- Removed extra tracked output files and kept `output/output.csv` as the single scientific data file.
+- Added `output/image_tracking.csv` with 96 image rows: first 5 successful and remaining 91 pending; documented Gavin's review asks and the Ordnance Survey coordinate answer.
+
+## 35. Multi-Page Table Context Fix
+- After the full batch was stopped, we identified the root cause of bad parses on continuation pages.
+- Some tables in the Birks scans span two pages. Page N shows all column headers (releve IDs, plot metadata rows) plus the first batch of species rows. Page N+1 shows only more species rows with no headers visible at all.
+- The parser was sending each image to the model in isolation, so on page N+1 the model had no way to know which releve column each cell belonged to. It produced garbled output or marked these pages as failed reads, even though the image data was fine.
+- Fixed by adding `build_previous_page_context()` to `parse_images.py`. Before each image, the script now builds a structured context block from the prior page's table metadata and releve column order and prepends it to the model prompt.
+- If the model still returns no plot rows for a continuation page (expected, since no headers are visible), the script falls back to the previous page's plot rows so every observation row still inherits correct releve IDs and coordinate metadata.
+- Updated `prompts/csv_parsing_instructions.md` with an explicit note at the top explaining multi-page tables and telling the model not to treat a headerless continuation page as a bad read.

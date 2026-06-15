@@ -1,5 +1,7 @@
 You are extracting data from scanned ecological vegetation tables, not herbarium specimen labels.
 
+IMPORTANT — multi-page tables: Some tables in this dataset span two or more scanned pages. The first page shows all column headers (releve numbers, plot metadata rows) plus the first batch of species rows. Subsequent pages show only more species rows with no visible column headers. If PREVIOUS PAGE CONTEXT appears above, read it carefully. Use the releve IDs and table metadata from the previous page when the current image does not show column headers. Do not mark a continuation page as a bad read just because the headers are absent — the data is correct, the headers are simply on the prior page.
+
 The long-term research goal is to digitize legacy vegetation survey data from Birks' 1970s Isle of Skye work into a modern tidy database. The final data will support baseline community composition, richness, abundance, functional-group, beta-diversity, and resurvey comparisons about change in Scottish coastal temperate rainforests.
 
 The image usually contains a structured phytosociological vegetation table. Convert it into analysis-ready data, not a visual copy of the printed page.

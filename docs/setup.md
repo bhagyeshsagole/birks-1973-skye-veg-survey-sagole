@@ -11,8 +11,7 @@ The pipeline converts scanned Birks vegetation survey tables into tidy CSV files
 The current target output is not a visual copy of the printed table. The target is analysis-ready research data:
 
 - `output/output.csv`: long-format species observations.
-- `output/plots.csv`: plot/releve metadata.
-- `output/tables.csv`: table-level metadata.
+- `output/image_tracking.csv`: simple image-level progress tracking.
 
 ## Current Folder Structure
 
@@ -117,13 +116,11 @@ If this command cannot connect, Ollama is not running yet.
 The current working models are:
 
 - `qwen2.5vl:3b` for image parsing.
-- `qwen2.5:3b` for text/name validation.
 
 Pull them once:
 
 ```bash
 ollama pull qwen2.5vl:3b
-ollama pull qwen2.5:3b
 ```
 
 Check installed models:
@@ -174,8 +171,8 @@ What this command does:
 - Uses `prompts/csv_parsing_instructions.md` as the extraction prompt.
 - Resizes a temporary copy of large images to a maximum side of 1000 pixels.
 - Allows a longer model response with `--num-predict 8192`.
-- Saves CSV output, status, and failure logs after every image.
-- Skips images already marked successful or failed when `--resume` is used.
+- Saves `output/output.csv` and `output/image_tracking.csv` after every image.
+- Skips images already marked `successful` or `unsuccessful` when `--resume` is used.
 
 After checking the three-image output, process all remaining images:
 
@@ -184,7 +181,7 @@ python3 scripts/parse_images.py --resume --batch-size 1 --max-image-side 1000 --
 ```
 
 You can stop this command and run the same command later. `--resume` reads
-`output/processed_images.json` and continues without repeating completed work.
+`output/image_tracking.csv` and continues without repeating completed work.
 
 To explicitly retry images that previously failed, run:
 
@@ -198,16 +195,12 @@ After a successful tidy run, check:
 
 ```text
 output/output.csv
-output/plots.csv
-output/tables.csv
-output/processed_images.json
-output/failed_images.csv
+output/image_tracking.csv
 ```
 
-`processed_images.json` stores each image's latest action, last extraction
-result, timestamp, error message, and output row counts. `failed_images.csv`
-stores a reviewable history of failed extraction attempts. Failures are no
-longer inserted into the scientific observation CSV as `PARSE_ERROR` rows.
+`output.csv` is the scientific data file. `image_tracking.csv` is the simple
+progress file with one row per image and statuses such as `successful`,
+`pending`, and `unsuccessful`.
 
 ### `output/output.csv`
 
@@ -229,65 +222,26 @@ Use this for:
 - beta-diversity
 - resurvey comparisons
 
-### `output/plots.csv`
+### `output/image_tracking.csv`
 
-Plot/releve metadata.
-
-One row means:
-
-```text
-one plot/releve
-```
-
-Use this for:
-
-- map references
-- British National Grid references
-- easting/northing coordinates
-- latitude/longitude coordinates when available or safely converted
-- altitude
-- aspect
-- slope
-- cover
-- plot size
-
-### `output/tables.csv`
-
-Table-level metadata.
+Image-level progress tracker.
 
 One row means:
 
 ```text
-one vegetation table or association
+one image in images/
 ```
 
 Use this for:
 
-- class
-- order
-- alliance
-- association
-- number of releves
-- reported total species count
+- seeing which images are `successful`
+- seeing which images are still `pending`
+- seeing which images were `unsuccessful`
+- reviewing the latest error message
+- resuming without repeating already accepted images
 
-## Validation Status
-
-`output/output_validated.csv` is now a species-level review file built from the current tidy `species` column.
-
-Current meaning:
-
-```text
-one row per unique species name
-```
-
-It currently performs a simple format check:
-
-- full binomial-looking names are marked lower risk
-- abbreviated genus names are flagged
-- names with source marks such as `*` are flagged
-- final taxonomic authority validation is still a future cleaning step
-
-`scripts/validate_names.py` still belongs to the older specimen-name workflow and should not be treated as the final tidy species validator yet.
+The first five images are currently marked `successful` because the accepted
+prototype output is already represented in `output/output.csv`.
 
 ## Optional Google Drive Download
 
@@ -311,7 +265,7 @@ The script asks for the Drive folder link and downloads files into `images/`.
 2. Activate the Python environment.
 3. Put images in `images/`.
 4. Run a small `--resume --limit 3` test.
-5. Inspect the three scientific CSVs plus the status and failure files.
+5. Inspect `output/output.csv` and `output/image_tracking.csv`.
 6. Fix prompts or code if the output is wrong.
 7. Run the full `--resume` command and leave it working locally.
 
@@ -389,7 +343,7 @@ Use:
 --batch-size 1 --max-image-side 1000
 ```
 
-Do not run the vision parser and validation model at the same time on an 8GB machine.
+Do not run multiple Ollama parsing jobs at the same time on an 8GB machine.
 
 ## Current Git Safety Rule
 

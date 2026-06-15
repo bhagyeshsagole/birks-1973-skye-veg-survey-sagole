@@ -3,13 +3,10 @@
 
 This is the main digitizing script.
 
-It can run in three modes:
+It runs in tidy mode:
 - tidy: the preferred mode. It writes analysis-ready CSVs:
-  output/output.csv for species observations,
-  output/plots.csv for plot/releve metadata,
-  output/tables.csv for table-level metadata.
-- table: an older helper mode. It tries to copy the printed table shape.
-- json: an older specimen-label mode. It extracts one JSON record per image.
+  output/output.csv for the scientific species observations,
+  output/image_tracking.csv for simple image-level progress.
 
 The current research goal is tidy mode because it is easiest to analyze later
 with pandas, ordination, richness calculations, and resurvey comparisons.
@@ -39,10 +36,7 @@ from PIL import Image
 DEFAULT_MODEL = "qwen2.5vl:3b"
 DEFAULT_IMAGES_DIR = Path("images")
 DEFAULT_OUTPUT_PATH = Path("output/output.csv")
-DEFAULT_PLOTS_OUTPUT_PATH = Path("output/plots.csv")
-DEFAULT_TABLES_OUTPUT_PATH = Path("output/tables.csv")
-DEFAULT_STATUS_PATH = Path("output/processed_images.json")
-DEFAULT_FAILED_OUTPUT_PATH = Path("output/failed_images.csv")
+DEFAULT_TRACKING_OUTPUT_PATH = Path("output/image_tracking.csv")
 DEFAULT_PROMPT_FILE = Path("prompts/csv_parsing_instructions.md")
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
@@ -124,12 +118,19 @@ TABLE_COLUMNS = [
     "notes",
 ]
 
-# A separate failure file keeps errors out of the scientific observation data.
-FAILURE_COLUMNS = [
-    "filename",
+# Columns for the simple image-level tracking CSV.
+# One row means: one source image and its current extraction status.
+TRACKING_COLUMNS = [
+    "image_file",
+    "image_number",
+    "status",
+    "last_attempt_at",
     "error_type",
     "error_message",
-    "timestamp",
+    "observations_added",
+    "plots_detected",
+    "tables_detected",
+    "note",
 ]
 
 # Columns for the older printed-table reconstruction mode.
@@ -200,22 +201,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--images-dir", type=Path, default=DEFAULT_IMAGES_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
-    parser.add_argument("--plots-output", type=Path, default=DEFAULT_PLOTS_OUTPUT_PATH)
-    parser.add_argument("--tables-output", type=Path, default=DEFAULT_TABLES_OUTPUT_PATH)
-    parser.add_argument("--status-file", type=Path, default=DEFAULT_STATUS_PATH)
-    parser.add_argument("--failed-output", type=Path, default=DEFAULT_FAILED_OUTPUT_PATH)
+    parser.add_argument("--tracking-output", type=Path, default=DEFAULT_TRACKING_OUTPUT_PATH)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument(
         "--mode",
-        choices=("tidy", "table", "json"),
+        choices=("tidy",),
         default="tidy",
-        help="Use tidy mode for analysis-ready CSVs, table mode for printed-table CSV, or json mode for older specimen-style extraction.",
+        help="Use tidy mode for the single analysis-ready output.csv file.",
     )
     parser.add_argument(
         "--prompt-file",
         type=Path,
         default=DEFAULT_PROMPT_FILE,
-        help="Prompt file used in tidy and table modes.",
+        help="Prompt file used for tidy extraction.",
     )
     parser.add_argument(
         "--batch-size",
@@ -234,7 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--retry-failed",
         action="store_true",
-        help="With --resume, retry images whose previous extraction attempt failed.",
+        help="With --resume, retry images marked unsuccessful in image_tracking.csv.",
     )
     parser.add_argument("--keep-raw", action="store_true")
     parser.add_argument(
@@ -679,7 +677,7 @@ def normalize_plot(
     table_id: str,
     image_file: str,
 ) -> dict[str, str]:
-    """Turn one model plot object into one output/plots.csv row."""
+    """Normalize one model plot object so observations can inherit metadata."""
     map_reference = normalize_map_reference(raw_row.get("map_reference"))
     os_grid_square = normalize_os_grid_square(raw_row.get("os_grid_square"))
     os_grid_reference = build_os_grid_reference(os_grid_square, map_reference)
@@ -717,7 +715,7 @@ def normalize_table(
     raw_metadata: dict[str, Any],
     image_file: str,
 ) -> dict[str, str]:
-    """Turn table-level model metadata into one output/tables.csv row."""
+    """Normalize table-level model metadata for output.csv rows."""
     return {
         "table_id": normalize_table_id(raw_metadata.get("table_id"), Path(image_file).stem),
         "image_file": image_file,
@@ -732,23 +730,84 @@ def normalize_table(
     }
 
 
+def build_previous_page_context(
+    prev_table_row: dict[str, str] | None,
+    prev_plot_rows: list[dict[str, str]],
+) -> str:
+    """Build a context block so the model can handle multi-page tables correctly.
+
+    Some tables in the Birks scans span two pages. Page N shows the column
+    headers (releve IDs, plot metadata) and the first batch of species rows.
+    Page N+1 shows only more species rows with no headers. Without this
+    context the model has no way to know which releve column each cell belongs
+    to and produces bad output. Prepending this block to the prompt fixes it.
+    """
+    if not prev_table_row:
+        return ""
+
+    parts = ["PREVIOUS PAGE CONTEXT (read before extracting this image):"]
+    table_id = prev_table_row.get("table_id", "")
+    association = prev_table_row.get("association", "")
+    class_ = prev_table_row.get("class", "")
+    order = prev_table_row.get("order", "")
+    alliance = prev_table_row.get("alliance", "")
+
+    desc = f"table_id={table_id}"
+    if association:
+        desc += f", association={association}"
+    if class_:
+        desc += f", class={class_}"
+    if order:
+        desc += f", order={order}"
+    if alliance:
+        desc += f", alliance={alliance}"
+    parts.append(f"The previous page contained: {desc}.")
+
+    if prev_plot_rows:
+        releve_ids = [p["releve_id"] for p in prev_plot_rows if p.get("releve_id")]
+        parts.append(f"Releve columns from previous page (left to right): {', '.join(releve_ids)}.")
+        parts.append(
+            "If this image continues that table without showing column headers, "
+            "use those same releve IDs for the observation data columns in this image."
+        )
+
+    parts.append(
+        "If this image starts a brand-new table with its own visible headers, "
+        "ignore all context above and extract fresh metadata instead."
+    )
+    parts.append("")
+    return "\n".join(parts)
+
+
 def parse_tidy_image(
     image_path: Path,
     model: str,
     prompt: str,
     max_image_side: int,
     num_predict: int,
+    previous_context: str = "",
+    previous_plot_rows: list[dict[str, str]] | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     """Parse one image into table rows, plot rows, and observation rows.
 
     Tidy mode asks the model for JSON because JSON is easier to validate than
     raw CSV when the answer contains nested data. The script then converts the
     JSON into normal CSV files.
+
+    previous_context is prepended to the prompt so the model knows what was on
+    the preceding page. This is essential for multi-page tables where column
+    headers only appear on the first page.
+
+    previous_plot_rows is used as a fallback when the model returns no plots
+    (i.e. this is a continuation page with no visible column headers). Plot
+    metadata — coordinates, altitude, ref_code — is inherited from the prior
+    page so observation rows stay self-contained.
     """
+    full_prompt = f"{previous_context}\n{prompt}" if previous_context else prompt
     raw_response = call_ollama_image(
         image_path=image_path,
         model=model,
-        prompt=prompt,
+        prompt=full_prompt,
         max_image_side=max_image_side,
         num_predict=num_predict,
         response_format="json",
@@ -771,9 +830,14 @@ def parse_tidy_image(
         for plot in raw_plots
         if isinstance(plot, dict)
     ]
+
+    # Continuation pages have no visible column headers, so the model returns
+    # no plots. Fall back to the previous page's plots so observations still
+    # inherit the correct releve IDs and coordinate metadata.
+    effective_plots = plot_rows if plot_rows else (previous_plot_rows or [])
     plots_by_releve = {
         plot["releve_id"]: plot
-        for plot in plot_rows
+        for plot in effective_plots
         if plot["releve_id"]
     }
 
@@ -882,138 +946,108 @@ def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def empty_status_data() -> dict[str, Any]:
-    """Create the top-level structure used by processed_images.json."""
-    return {"version": 1, "images": {}}
+def load_tracking_rows(tracking_path: Path, resume: bool) -> list[dict[str, str]]:
+    """Load the human-readable image progress tracker.
 
-
-def load_status_data(status_path: Path, resume: bool) -> dict[str, Any]:
-    """Load durable image statuses, or start a fresh status file.
-
-    A non-resume run intentionally starts fresh. A resume run validates the
-    existing JSON so damaged state is reported instead of silently ignored.
+    This CSV replaces the older JSON status file and failure log. It is easier
+    to review because each source image gets one simple row.
     """
-    if not resume or not status_path.exists():
-        return empty_status_data()
-
-    with status_path.open(encoding="utf-8") as status_file:
-        data = json.load(status_file)
-    if not isinstance(data, dict) or not isinstance(data.get("images"), dict):
-        raise ValueError(f"Invalid status file structure: {status_path}")
-    return data
+    if not resume or not tracking_path.exists():
+        return []
+    return load_existing_rows(tracking_path, TRACKING_COLUMNS).to_dict("records")
 
 
-def save_status_data(status_data: dict[str, Any], status_path: Path) -> None:
-    """Atomically save processed image status so resume data remains valid."""
-    status_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = status_path.with_name(f".{status_path.name}.tmp")
-    with temporary_path.open("w", encoding="utf-8") as status_file:
-        json.dump(status_data, status_file, indent=2, ensure_ascii=False, sort_keys=True)
-        status_file.write("\n")
-    temporary_path.replace(status_path)
+def tracking_by_image(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    """Return tracking rows keyed by image path for fast resume checks."""
+    return {row["image_file"]: row for row in rows if row.get("image_file")}
 
 
-def status_record(status_data: dict[str, Any], image_path: Path) -> dict[str, Any]:
-    """Return one image's saved status record, or an empty record."""
-    record = status_data["images"].get(str(image_path), {})
-    return record if isinstance(record, dict) else {}
+def initialize_tracking_rows(
+    images: list[Path],
+    existing_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Make sure image_tracking.csv has one row for every source image.
+
+    The first five images are marked successful because the current accepted
+    prototype output already represents that initial reviewed batch. New images
+    start as pending until the parser attempts them.
+    """
+    existing = tracking_by_image(existing_rows)
+    initialized: list[dict[str, str]] = []
+    for index, image_path in enumerate(images, start=1):
+        image_file = str(image_path)
+        if image_file in existing:
+            row = existing[image_file]
+        else:
+            status = "successful" if index <= 5 else "pending"
+            note = (
+                "Existing first-five prototype accepted in output.csv."
+                if index <= 5
+                else ""
+            )
+            row = {
+                "image_file": image_file,
+                "image_number": str(index),
+                "status": status,
+                "last_attempt_at": "",
+                "error_type": "",
+                "error_message": "",
+                "observations_added": "",
+                "plots_detected": "",
+                "tables_detected": "",
+                "note": note,
+            }
+        for column in TRACKING_COLUMNS:
+            row.setdefault(column, "")
+        row["image_number"] = row.get("image_number") or str(index)
+        initialized.append(row)
+    return initialized
 
 
-def previous_result(record: dict[str, Any]) -> str:
-    """Return the last extraction result even if the latest action was skipped."""
-    result = record.get("result_status")
-    if result in {"success", "failed"}:
-        return result
-    status = record.get("status")
-    return status if status in {"success", "failed"} else ""
-
-
-def skip_reason(record: dict[str, Any], retry_failed: bool) -> str:
-    """Explain why resume should skip an image, or return an empty string."""
-    result = previous_result(record)
-    if result == "success":
-        return "already successful"
-    if result == "failed" and not retry_failed:
-        return "previously failed; use --retry-failed to retry"
-    return ""
-
-
-def update_status(
-    status_data: dict[str, Any],
+def update_tracking_row(
+    rows: list[dict[str, str]],
     image_path: Path,
-    status: str,
     *,
-    error_message: str = "",
-    output_row_counts: dict[str, int] | None = None,
-    reason: str = "",
+    status: str,
+    error: Exception | None = None,
+    observations_added: int | str = "",
+    plots_detected: int | str = "",
+    tables_detected: int | str = "",
+    note: str = "",
 ) -> None:
-    """Record the latest action and preserve the last real extraction result.
-
-    The visible status can be success, failed, or skipped. result_status keeps
-    the last actual extraction outcome, so marking an already successful image
-    as skipped does not make a later resume accidentally process it again.
-    """
-    old_record = status_record(status_data, image_path)
-    result_status = previous_result(old_record)
-    if status in {"success", "failed"}:
-        result_status = status
-
-    if status == "skipped" and not error_message:
-        error_message = str(old_record.get("error_message", ""))
-
-    status_data["images"][str(image_path)] = {
-        "filename": str(image_path),
-        "status": status,
-        "result_status": result_status,
-        "timestamp": utc_timestamp(),
-        "error_message": error_message,
-        "skip_reason": reason,
-        "output_row_counts": output_row_counts or old_record.get("output_row_counts", {}),
-    }
+    """Update one row in image_tracking.csv after an extraction attempt."""
+    image_file = str(image_path)
+    for row in rows:
+        if row.get("image_file") == image_file:
+            row["status"] = status
+            row["last_attempt_at"] = utc_timestamp()
+            row["error_type"] = type(error).__name__ if error else ""
+            row["error_message"] = str(error) if error else ""
+            row["observations_added"] = str(observations_added)
+            row["plots_detected"] = str(plots_detected)
+            row["tables_detected"] = str(tables_detected)
+            row["note"] = note
+            return
 
 
-def append_failure(
-    failure_rows: list[dict[str, str]], image_path: Path, error: Exception
-) -> None:
-    """Append one failed extraction attempt to failed_images.csv data."""
-    failure_rows.append(
-        {
-            "filename": str(image_path),
-            "error_type": type(error).__name__,
-            "error_message": str(error),
-            "timestamp": utc_timestamp(),
-        }
-    )
-
-
-def record_command_skips(status_data: dict[str, Any], args: argparse.Namespace) -> int:
-    """Record images deliberately excluded by --skip without marking them done.
-
-    Their visible status is skipped, but result_status remains empty unless an
-    earlier run actually succeeded or failed. A later full resume can therefore
-    still process an image that was only excluded by command selection.
-    """
-    for image_path in args.explicitly_skipped:
-        reason = "excluded by --skip"
-        update_status(status_data, image_path, "skipped", reason=reason)
-        print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
-    return len(args.explicitly_skipped)
+def tracking_skip_reason(row: dict[str, str], retry_failed: bool) -> str:
+    """Explain why resume should skip an image, or return an empty string."""
+    status = row.get("status", "")
+    if status == "successful":
+        return "already successful"
+    if status == "unsuccessful" and not retry_failed:
+        return "previously unsuccessful; use --retry-failed to retry"
+    return ""
 
 
 def save_tidy_outputs(
     args: argparse.Namespace,
     observation_rows: list[dict[str, str]],
-    plot_rows: list[dict[str, str]],
-    table_rows: list[dict[str, str]],
-    status_data: dict[str, Any],
-    failure_rows: list[dict[str, str]],
+    tracking_rows: list[dict[str, str]],
 ) -> None:
-    """Save all tidy CSVs, statuses, and failures after one image."""
+    """Save the main scientific CSV and the simple image tracker."""
     save_rows(observation_rows, args.output, OBSERVATION_COLUMNS)
-    save_rows(plot_rows, args.plots_output, PLOT_COLUMNS)
-    save_rows(table_rows, args.tables_output, TABLE_COLUMNS)
-    save_status_data(status_data, args.status_file)
-    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+    save_rows(tracking_rows, args.tracking_output, TRACKING_COLUMNS)
 
 
 def print_run_summary(
@@ -1028,87 +1062,48 @@ def print_run_summary(
     print(f"Processed successfully: {successful}")
     print(f"Skipped: {skipped}")
     print(f"Failed: {failed}")
-    print(f"Observations: {args.output}")
-    if args.mode == "tidy":
-        print(f"Plots: {args.plots_output}")
-        print(f"Tables: {args.tables_output}")
-    print(f"Status: {args.status_file}")
-    print(f"Failures: {args.failed_output}")
+    print(f"Main output: {args.output}")
+    print(f"Image tracker: {args.tracking_output}")
 
 
 def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
     """Run the preferred analysis-ready extraction workflow.
 
-    This writes three linked files:
-    - output/output.csv for long-format species observations
-    - output/plots.csv for plot/releve metadata
-    - output/tables.csv for table-level metadata
+    This writes one scientific CSV and one simple image tracker:
+    - output/output.csv for long-format species observations with metadata
+    - output/image_tracking.csv for image-level success/failure status
     """
     prompt = read_prompt(args.prompt_file)
 
-    # Resume mode starts from existing CSVs instead of starting over.
+    # Resume mode starts from the accepted output CSV and the image tracker.
     observation_rows = (
         load_existing_rows(args.output, OBSERVATION_COLUMNS).to_dict("records")
         if args.resume
         else []
     )
-    plot_rows = (
-        load_existing_rows(args.plots_output, PLOT_COLUMNS).to_dict("records")
-        if args.resume
-        else []
-    )
-    table_rows = (
-        load_existing_rows(args.tables_output, TABLE_COLUMNS).to_dict("records")
-        if args.resume
-        else []
-    )
-    status_data = load_status_data(args.status_file, args.resume)
-    failure_rows = (
-        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
-        if args.resume
-        else []
+    tracking_rows = initialize_tracking_rows(
+        args.all_images,
+        load_tracking_rows(args.tracking_output, args.resume),
     )
     successful = 0
     failed = 0
+    skipped = 0
 
-    # If this is the first run with a status file, import successful image paths
-    # from tables.csv so older resume data still protects completed work.
-    if args.resume:
-        for row in table_rows:
-            image_file = row.get("image_file", "")
-            if (
-                image_file
-                and Path(image_file).exists()
-                and image_file not in status_data["images"]
-            ):
-                update_status(status_data, Path(image_file), "success")
+    save_tidy_outputs(args, observation_rows, tracking_rows)
 
-    skipped = record_command_skips(status_data, args)
-
-    save_tidy_outputs(
-        args,
-        observation_rows,
-        plot_rows,
-        table_rows,
-        status_data,
-        failure_rows,
-    )
+    # These carry column-header context across pages so multi-page tables parse
+    # correctly. A table that starts on page N and continues on page N+1 only
+    # shows releve IDs and plot metadata on page N, so page N+1 needs them.
+    prev_table_row: dict[str, str] | None = None
+    prev_plot_rows: list[dict[str, str]] = []
 
     for image_path in images:
         position = args.image_positions[str(image_path)]
-        record = status_record(status_data, image_path)
-        reason = skip_reason(record, args.retry_failed) if args.resume else ""
+        tracking_row = tracking_by_image(tracking_rows).get(str(image_path), {})
+        reason = tracking_skip_reason(tracking_row, args.retry_failed) if args.resume else ""
         if reason:
             skipped += 1
-            update_status(status_data, image_path, "skipped", reason=reason)
-            save_tidy_outputs(
-                args,
-                observation_rows,
-                plot_rows,
-                table_rows,
-                status_data,
-                failure_rows,
-            )
+            save_tidy_outputs(args, observation_rows, tracking_rows)
             print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
             continue
 
@@ -1118,227 +1113,54 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
         )
         try:
             # Remove this image's old rows before a retry. This prevents
-            # duplicates if a previous run saved CSVs but stopped before its
-            # success status reached processed_images.json.
+            # duplicate observations if the same image is parsed again.
             image_name = str(image_path)
             observation_rows = [
                 row for row in observation_rows if row.get("image_file") != image_name
             ]
-            plot_rows = [
-                row for row in plot_rows if row.get("image_file") != image_name
-            ]
-            table_rows = [
-                row for row in table_rows if row.get("image_file") != image_name
-            ]
+            page_context = build_previous_page_context(prev_table_row, prev_plot_rows)
             image_tables, image_plots, image_observations = parse_tidy_image(
                 image_path,
                 args.model,
                 prompt,
                 args.max_image_side,
                 args.num_predict,
+                previous_context=page_context,
+                previous_plot_rows=prev_plot_rows,
             )
-            table_rows.extend(image_tables)
-            plot_rows.extend(image_plots)
             observation_rows.extend(image_observations)
             successful += 1
-            update_status(
-                status_data,
+            update_tracking_row(
+                tracking_rows,
                 image_path,
-                "success",
-                output_row_counts={
-                    "observations": len(image_observations),
-                    "plots": len(image_plots),
-                    "tables": len(image_tables),
-                },
+                status="successful",
+                observations_added=len(image_observations),
+                plots_detected=len(image_plots),
+                tables_detected=len(image_tables),
             )
+            # Carry table context forward for the next image. When a page has
+            # its own column headers (image_plots non-empty) both are refreshed.
+            # When it is a continuation page (no plots), keep prev_plot_rows so
+            # the page after it can also inherit the column structure.
+            if image_tables:
+                prev_table_row = image_tables[0]
+            if image_plots:
+                prev_plot_rows = image_plots
             print(f"SUCCESS: {image_path.name}", flush=True)
         except Exception as error:
             failed += 1
-            append_failure(failure_rows, image_path, error)
-            update_status(status_data, image_path, "failed", error_message=str(error))
+            update_tracking_row(
+                tracking_rows,
+                image_path,
+                status="unsuccessful",
+                error=error,
+            )
             print(f"FAILED: {image_path.name} - {error}", flush=True)
 
-        # Saving every image makes interruption recovery independent of batch size.
-        save_tidy_outputs(
-            args,
-            observation_rows,
-            plot_rows,
-            table_rows,
-            status_data,
-            failure_rows,
-        )
+        # Saving after every image keeps interruption recovery simple.
+        save_tidy_outputs(args, observation_rows, tracking_rows)
 
-    # Create all state files even when every selected image was skipped.
-    save_tidy_outputs(
-        args,
-        observation_rows,
-        plot_rows,
-        table_rows,
-        status_data,
-        failure_rows,
-    )
-    print_run_summary(args, successful, skipped, failed)
-
-
-def run_table_mode(args: argparse.Namespace, images: list[Path]) -> None:
-    """Run the older printed-table reconstruction workflow."""
-    prompt = read_prompt(args.prompt_file)
-    rows = (
-        load_existing_rows(args.output, TABLE_OUTPUT_COLUMNS).to_dict("records")
-        if args.resume
-        else []
-    )
-    status_data = load_status_data(args.status_file, args.resume)
-    failure_rows = (
-        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
-        if args.resume
-        else []
-    )
-    successful = 0
-    failed = 0
-    skipped = record_command_skips(status_data, args)
-
-    save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
-    save_status_data(status_data, args.status_file)
-    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-
-    for image_path in images:
-        position = args.image_positions[str(image_path)]
-        reason = (
-            skip_reason(status_record(status_data, image_path), args.retry_failed)
-            if args.resume
-            else ""
-        )
-        if reason:
-            skipped += 1
-            update_status(status_data, image_path, "skipped", reason=reason)
-            save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
-            save_status_data(status_data, args.status_file)
-            save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-            print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
-            continue
-
-        print(
-            f"Processing {position}/{args.total_images_found}: {image_path.name}",
-            flush=True,
-        )
-        try:
-            image_rows = parse_table_image(
-                image_path,
-                args.model,
-                prompt,
-                args.max_image_side,
-                args.num_predict,
-            )
-            rows.extend(image_rows)
-            successful += 1
-            update_status(
-                status_data,
-                image_path,
-                "success",
-                output_row_counts={"table_rows": len(image_rows)},
-            )
-            print(f"SUCCESS: {image_path.name}", flush=True)
-        except Exception as error:
-            failed += 1
-            append_failure(failure_rows, image_path, error)
-            update_status(status_data, image_path, "failed", error_message=str(error))
-            print(f"FAILED: {image_path.name} - {error}", flush=True)
-
-        save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
-        save_status_data(status_data, args.status_file)
-        save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-
-    save_rows(rows, args.output, TABLE_OUTPUT_COLUMNS)
-    save_status_data(status_data, args.status_file)
-    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-    print_run_summary(args, successful, skipped, failed)
-
-
-def run_json_mode(args: argparse.Namespace, images: list[Path]) -> None:
-    """Run the older specimen-label extraction workflow."""
-    existing_frame = (
-        load_existing_rows(args.output, JSON_OUTPUT_COLUMNS)
-        if args.resume
-        else pd.DataFrame(columns=JSON_OUTPUT_COLUMNS)
-    )
-    rows = existing_frame.to_dict("records")
-    status_data = load_status_data(args.status_file, args.resume)
-    failure_rows = (
-        load_existing_rows(args.failed_output, FAILURE_COLUMNS).to_dict("records")
-        if args.resume
-        else []
-    )
-    successful = 0
-    failed = 0
-
-    if args.resume:
-        for row in rows:
-            if (
-                row.get("parse_status") == "ok"
-                and row.get("image_file")
-                and row["image_file"] not in status_data["images"]
-            ):
-                update_status(status_data, Path(row["image_file"]), "success")
-
-    skipped = record_command_skips(status_data, args)
-
-    save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
-    save_status_data(status_data, args.status_file)
-    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-
-    for image_path in images:
-        position = args.image_positions[str(image_path)]
-        reason = (
-            skip_reason(status_record(status_data, image_path), args.retry_failed)
-            if args.resume
-            else ""
-        )
-        if reason:
-            skipped += 1
-            update_status(status_data, image_path, "skipped", reason=reason)
-            save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
-            save_status_data(status_data, args.status_file)
-            save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-            print(f"SKIPPED: {image_path.name} - {reason}", flush=True)
-            continue
-
-        print(
-            f"Processing {position}/{args.total_images_found}: {image_path.name}",
-            flush=True,
-        )
-        try:
-            image_name = str(image_path)
-            rows = [row for row in rows if row.get("image_file") != image_name]
-            image_row = parse_json_image(
-                image_path,
-                args.model,
-                args.keep_raw,
-                args.max_image_side,
-                args.num_predict,
-            )
-            rows.append(image_row)
-            successful += 1
-            update_status(
-                status_data,
-                image_path,
-                "success",
-                output_row_counts={"json_rows": 1},
-            )
-            print(f"SUCCESS: {image_path.name}", flush=True)
-        except Exception as error:
-            failed += 1
-            append_failure(failure_rows, image_path, error)
-            update_status(status_data, image_path, "failed", error_message=str(error))
-            print(f"FAILED: {image_path.name} - {error}", flush=True)
-
-        save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
-        save_status_data(status_data, args.status_file)
-        save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
-
-    save_rows(rows, args.output, JSON_OUTPUT_COLUMNS)
-    save_status_data(status_data, args.status_file)
-    save_rows(failure_rows, args.failed_output, FAILURE_COLUMNS)
+    save_tidy_outputs(args, observation_rows, tracking_rows)
     print_run_summary(args, successful, skipped, failed)
 
 
@@ -1346,6 +1168,7 @@ def main() -> None:
     """Read command-line arguments, find images, and dispatch to one mode."""
     args = build_parser().parse_args()
     all_images = find_images(args.images_dir)
+    args.all_images = all_images
     args.total_images_found = len(all_images)
     args.image_positions = {
         str(image_path): index
@@ -1358,12 +1181,7 @@ def main() -> None:
     if args.limit is not None:
         images = images[: args.limit]
 
-    if args.mode == "tidy":
-        run_tidy_mode(args, images)
-    elif args.mode == "table":
-        run_table_mode(args, images)
-    else:
-        run_json_mode(args, images)
+    run_tidy_mode(args, images)
 
 
 if __name__ == "__main__":

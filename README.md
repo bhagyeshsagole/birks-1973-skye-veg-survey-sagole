@@ -53,7 +53,6 @@ Ollama must be running before either model-backed script is started. Pull the mo
 
 ```bash
 ollama pull qwen2.5vl:3b
-ollama pull qwen2.5:3b
 ```
 
 `qwen2.5vl:3b` is the default vision model for this 8GB MacBook Air because it completed the first local smoke test.
@@ -69,15 +68,12 @@ python3 scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-si
 This reads supported images from `images/`, sends one image at a time to `qwen2.5vl:3b`, uses `prompts/csv_parsing_instructions.md`, and writes tidy CSV outputs:
 
 - `output/output.csv` for long-format species observations
-- `output/plots.csv` for plot/releve metadata, including British National Grid references, easting/northing, and latitude/longitude fields when available
-- `output/tables.csv` for table-level metadata
-- `output/processed_images.json` for durable success, failure, and skip status
-- `output/failed_images.csv` for error type, message, and timestamp
+- `output/image_tracking.csv` for one-row-per-image progress tracking
 
-The script saves all output and state files after every image. `--resume` skips
-previously successful and failed images, so the same command can safely be run
-again after an interruption. Use `--retry-failed` when failed images should be
-attempted again.
+The script saves both files after every image. `--resume` skips images already
+marked `successful` or `unsuccessful`, so the same command can safely be run
+again after an interruption. Use `--retry-failed` when unsuccessful images
+should be attempted again.
 
 After reviewing the three-image test, process all remaining images:
 
@@ -92,18 +88,6 @@ python3 scripts/parse_images.py --resume --retry-failed --batch-size 1 --max-ima
 ```
 
 `--max-image-side` makes a temporary resized copy for Ollama without changing the original scan. `--num-predict` caps the model response length. `--batch-size` remains accepted for compatibility, but durable runs save after every image.
-
-`output/output_validated.csv` is currently a species-level format-check/review file built from `output/output.csv`.
-
-The older species-name validation script is still available, but it was built for the earlier specimen-label workflow:
-
-```bash
-python3 scripts/validate_names.py --resume --batch-size 50
-```
-
-Future model-backed validation should target the `species` column in `output/output.csv`.
-
-Do not run `scripts/parse_images.py` and `scripts/validate_names.py` at the same time on the 8GB MacBook Air. Running them separately avoids loading both Ollama models together.
 
 Optionally download a Google Drive image folder into `images/`:
 

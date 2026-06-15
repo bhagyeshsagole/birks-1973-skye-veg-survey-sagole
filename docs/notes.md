@@ -1,8 +1,16 @@
 # Notes
 
-## Output CSVs Explained
+## Current Output Files
 
-The `output/` folder has one main data file and two linked metadata files. Together, they describe a vegetation table in a form that can be analyzed later in Python.
+The `output/` folder is intentionally simple now:
+
+- `output/output.csv`: the main scientific data file.
+- `output/image_tracking.csv`: one-row-per-image progress tracker.
+
+We removed the separate `plots.csv`, `tables.csv`, `output_validated.csv`,
+`failed_images.csv`, and `processed_images.json` files because they made the
+output folder harder to understand. The useful plot and table fields are now
+kept directly inside `output/output.csv`.
 
 ## `output/output.csv`
 
@@ -19,7 +27,7 @@ Each row means:
 one species in one releve / plot
 ```
 
-So if one table has 25 species and 7 releves, the long-format observation file should have:
+For example, a table with 25 species and 7 releves should produce about:
 
 ```text
 25 species x 7 plots = 175 rows
@@ -27,234 +35,133 @@ So if one table has 25 species and 7 releves, the long-format observation file s
 
 Important columns:
 
-- `table_id`: which vegetation table or association this row came from.
-- `image_file`: source image or source note for this row.
-- `class`, `order`, `alliance`, `association`: phytosociological classification.
-- `releve_id`: plot number, such as `1`, `2`, or `3`.
+- `table_id`: printed table number in machine form, such as `table_4_1`.
+- `image_file`: source image or source note for the row.
+- `class`, `order`, `alliance`, `association`: vegetation classification.
+- `releve_id`: plot number inside the table.
 - `ref_code`: original field/reference code, such as `B68-155`.
-- `map_reference`: old map/grid reference from the printed table.
+- `map_reference`: printed map/grid reference.
 - `os_grid_square`: British National Grid square, such as `NG`.
-- `os_grid_reference`: full British National Grid reference, such as `NG504446`.
-- `easting`, `northing`: British National Grid metre coordinates derived from `os_grid_square` and `map_reference`.
-- `latitude`, `longitude`: decimal-degree coordinates for mapping when printed directly or safely converted from the grid reference.
-- `altitude_ft`, `altitude_m`, `aspect_deg`, `slope_deg`, `cover_pct`, `plot_area_m2`: environmental data for that plot.
-- `species_reported`: number of species reported for that specific releve/plot.
-- `species`: species name.
-- `domin_value`: extracted Domin-scale abundance value.
-- `domin_cover_min_pct`, `domin_cover_max_pct`: percent-cover range represented by numeric Domin categories.
+- `os_grid_reference`: full grid reference, such as `NG504446`.
+- `easting`, `northing`: British National Grid metre coordinates.
+- `latitude`, `longitude`: WGS84 decimal-degree coordinates when safely available.
+- `altitude_ft`, `altitude_m`, `aspect_deg`, `slope_deg`, `cover_pct`, `plot_area_m2`: plot environmental fields.
+- `species_reported`: number of species reported for that specific releve.
+- `species`: taxon name as extracted from the table.
+- `domin_value`: original Domin-scale value or symbol.
+- `domin_cover_min_pct`, `domin_cover_max_pct`: numeric percent-cover range for Domin values 1-10.
 - `presence_binary`: `1` means present, `0` means absent.
-- `raw_value`: original printed symbol or value.
+- `raw_value`: original printed table cell.
 - `constancy_class`: summary column C, such as `II`, `III`, or `V`.
 - `summary_value`: summary column D, such as `0.5`, `5.3`, or `6.3`.
-- `total_species_reported`: total species count reported by the printed table.
+- `total_species_reported`: total species count for the whole printed table.
 - `needs_review`: whether the row needs manual checking.
-- `note`: explanation for uncertainty or review flags.
+- `note`: short explanation for uncertainty.
+
+## Gavin Review Checklist
+
+Gavin asked for four main fixes. Current status:
+
+- Releve-specific species counts: done with `species_reported`.
+- Table number as table id: done with values like `table_4_1`.
+- Latitude/longitude from British mapping framework: implemented when a full British National Grid reference is available.
+- Domin-scale numeric equivalents: done with `domin_cover_min_pct` and `domin_cover_max_pct`.
+
+## Answer To Gavin's Mapping Question
+
+The mapping framework is the British National Grid, maintained by Ordnance
+Survey. The table gives map-reference numbers, but coordinate conversion needs
+both parts:
+
+```text
+os_grid_square + map_reference
+```
 
 Example:
 
 ```text
-species = Festuca rubra
-releve_id = 3
-domin_value = 2
-presence_binary = 1
+NG + 504446 = NG504446
 ```
 
-This means `Festuca rubra` was present in plot 3 with Domin value 2.
-
-If:
+The script can convert a complete British National Grid reference into:
 
 ```text
-domin_value = .
-presence_binary = 0
+easting, northing, latitude, longitude
 ```
 
-That means the species was absent from that plot.
+The latitude/longitude output is WGS84 decimal degrees. We should not guess
+coordinates from only a partial map reference. If the two-letter grid square is
+missing or uncertain, the coordinate fields should stay blank until checked.
 
-If:
+The BGS bulk-conversion page is useful as a reference/validation source. For
+the local offline pipeline, the parser uses an internal OSGB36 to WGS84
+conversion so we do not depend on a web service during batch extraction.
+
+## Domin Scale Handling
+
+The current conversion follows the 10-point Domin scale Gavin provided:
 
 ```text
-raw_value = x
-domin_value = x
-presence_binary = 1
+1 = 0-4%, very rare / one or a few individuals
+2 = 0-4%, scattered individuals
+3 = 0-4%, frequent individuals
+4 = 4-10%
+5 = 10-25%
+6 = 25-33%
+7 = 33-50%
+8 = 50-75%
+9 = 75-90%
+10 = 90-100%
+. = absent / not detected
 ```
 
-That means the printed table showed a presence mark instead of a numeric Domin value.
+The original printed value stays in `domin_value` and `raw_value`. The converted
+range goes into `domin_cover_min_pct` and `domin_cover_max_pct`.
 
-Why this matters:
+## `output/image_tracking.csv`
 
-- This is the file used for richness calculations.
-- It supports species composition analysis.
-- It supports abundance summaries.
-- It supports ordination such as NMDS or PCA.
-- It supports beta-diversity and resurvey comparison work.
-
-## `output/plots.csv`
-
-This is the plot/releve metadata file.
+This is the simple progress tracker for the image batch.
 
 Current shape:
 
-- 7 rows
-- 20 columns
-
-Each row means:
-
-```text
-one releve / plot
-```
-
-Important columns:
-
-- `table_id`: links the plot back to the table.
-- `releve_id`: plot number.
-- `ref_code`: original field/reference code.
-- `map_reference`: original map/grid reference.
-- `os_grid_square`: British National Grid square, such as `NG`.
-- `os_grid_reference`: full British National Grid reference.
-- `easting`, `northing`: British National Grid metre coordinates.
-- `latitude`, `longitude`: decimal-degree coordinates for GIS/maps. Leave blank until the map reference can be safely converted.
-- `altitude_ft`, `altitude_m`: elevation.
-- `aspect_deg`: slope direction.
-- `slope_deg`: slope steepness.
-- `cover_pct`: vegetation cover percentage.
-- `plot_area_m2`: plot size.
-- `species_reported`: number of species reported for this plot in the printed table.
-- `needs_review`: whether the plot row needs checking.
-- `note`: explanation if anything is uncertain.
-
-Why this matters:
-
-- It lets us map historical plots.
-- It lets us compare vegetation composition against environmental variables.
-- It avoids repeating plot metadata by hand in multiple places.
-
-## `output/tables.csv`
-
-This is the table-level metadata file.
-
-Current shape:
-
-- 1 row
+- 96 rows
 - 10 columns
 
 Each row means:
 
 ```text
-one vegetation table / association
+one image in images/
 ```
 
 Important columns:
 
-- `table_id`: table or association identifier.
-- `image_file`: source image or source note.
-- `class`, `order`, `alliance`, `association`: phytosociological hierarchy.
-- `n_releves`: number of plots in the table.
-- `total_species_reported`: total species count reported by the table.
-- `mean_species_per_releve`: reported mean species count, if available.
-- `notes`: table-level notes.
+- `image_file`: image path.
+- `image_number`: natural sort position from 1 to 96.
+- `status`: `successful`, `pending`, or `unsuccessful`.
+- `last_attempt_at`: timestamp for the latest parse attempt.
+- `error_type`: Python/Ollama error type when unsuccessful.
+- `error_message`: what failed.
+- `observations_added`: number of rows added to `output.csv`.
+- `plots_detected`: number of plot objects found in the model response.
+- `tables_detected`: number of table metadata objects found.
+- `note`: short explanation, such as first-five prototype status.
 
-Why this matters:
+Current tracker initialization:
 
-- It gives the scientific context for each plot and species observation.
-- It lets later analysis group plots by vegetation community type.
-
-## `output/output_validated.csv`
-
-This is the species-name review file for the current tidy output.
-
-Current shape:
-
-- 25 rows
-- 10 columns
-
-Each row means:
-
-```text
-one unique species name from output/output.csv
-```
-
-Important columns:
-
-- `table_id`: table where the species appears.
-- `species`: species name as currently stored in `output/output.csv`.
-- `corrected_species`: current corrected/review name. At this stage it matches `species`.
-- `validation_status`: current review status.
-- `confidence`: simple format-check confidence.
-- `flag`: `true` means the name needs human review.
-- `note`: why the row is flagged or what kind of check was done.
-- `observations_count`: number of observation rows for that species.
-- `present_count`: number of plots where that species is present.
-- `domin_values_seen`: Domin values or presence/absence symbols seen for that species.
-
-Current status:
-
-```text
-output_validated.csv is a format-check species review file, not a final taxonomic authority validation.
-```
-
-Why this matters:
-
-- It separates species-name review from plot-by-plot observations.
-- It highlights abbreviated names such as `R. heterostichum`.
-- It highlights special source marks such as `*Parmelia glabratula`.
-- It gives a clean place for later taxonomic authority validation.
-
-## `output/processed_images.json`
-
-This is the durable resume file for unattended extraction.
-
-Each image record stores:
-
-- `status`: the latest action, such as `success`, `failed`, or `skipped`.
-- `result_status`: the last real extraction result, even after a resume skip.
-- `timestamp`: when the record was last updated.
-- `error_message`: the failure reason when extraction failed.
-- `skip_reason`: why an image was skipped.
-- `output_row_counts`: how many table, plot, and observation rows were produced.
-
-The script checks this file when `--resume` is used. Successful images are not
-repeated. Failed images are also skipped unless `--retry-failed` is supplied.
-
-## `output/failed_images.csv`
-
-This is the dedicated history of failed extraction attempts.
-
-Its columns are:
-
-- `filename`
-- `error_type`
-- `error_message`
-- `timestamp`
-
-Keeping failures here prevents error placeholders from being mixed into the
-scientific species observation rows in `output/output.csv`.
+- Images 1-5 are marked `successful` because the first accepted prototype batch is already represented in `output.csv`.
+- Images 6-96 are marked `pending`.
 
 ## How The Files Connect
 
-The current tidy structure is:
+The working structure is now:
 
 ```text
-tables.csv
-  one row per vegetation table
-
-plots.csv
-  one row per plot/releve inside that table
-
 output.csv
-  one row per species per plot/releve
+  scientific data, one species per releve/plot row
+
+image_tracking.csv
+  image-level progress, one image per row
 ```
 
-The key linking columns are:
-
-```text
-table_id
-releve_id
-```
-
-That lets us connect:
-
-```text
-species observation -> plot metadata -> table classification
-```
-
-This structure is relevant because the project goal is not just OCR. The goal is to turn old vegetation tables into modern research data that can support richness, abundance, composition, mapping, functional-group, beta-diversity, and resurvey comparisons.
+This keeps the folder readable while preserving the data needed for richness,
+abundance, composition, mapping, beta-diversity, and future resurvey analysis.
