@@ -256,3 +256,7 @@
 - Fixed by adding `build_previous_page_context()` to `parse_images.py`. Before each image, the script now builds a structured context block from the prior page's table metadata and releve column order and prepends it to the model prompt.
 - If the model still returns no plot rows for a continuation page (expected, since no headers are visible), the script falls back to the previous page's plot rows so every observation row still inherits correct releve IDs and coordinate metadata.
 - Updated `prompts/csv_parsing_instructions.md` with an explicit note at the top explaining multi-page tables and telling the model not to treat a headerless continuation page as a bad read.
+
+## 35. Images 6-10 Parse Attempt Blocked
+- Tried to run images 6-10 from Codex, but the sandbox could not connect to local Ollama and escalation approval timed out.
+- No scientific rows were added; `output.csv` remains 175 rows and images 6-10 were reset to pending in `image_tracking.csv`.
