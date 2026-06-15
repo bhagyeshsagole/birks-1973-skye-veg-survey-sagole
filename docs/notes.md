@@ -11,7 +11,7 @@ This is the main species-observation file.
 Current shape:
 
 - 175 rows
-- 26 columns
+- 33 columns
 
 Each row means:
 
@@ -33,10 +33,15 @@ Important columns:
 - `releve_id`: plot number, such as `1`, `2`, or `3`.
 - `ref_code`: original field/reference code, such as `B68-155`.
 - `map_reference`: old map/grid reference from the printed table.
+- `os_grid_square`: British National Grid square, such as `NG`.
+- `os_grid_reference`: full British National Grid reference, such as `NG504446`.
+- `easting`, `northing`: British National Grid metre coordinates derived from `os_grid_square` and `map_reference`.
 - `latitude`, `longitude`: decimal-degree coordinates for mapping when printed directly or safely converted from the grid reference.
 - `altitude_ft`, `altitude_m`, `aspect_deg`, `slope_deg`, `cover_pct`, `plot_area_m2`: environmental data for that plot.
+- `species_reported`: number of species reported for that specific releve/plot.
 - `species`: species name.
 - `domin_value`: extracted Domin-scale abundance value.
+- `domin_cover_min_pct`, `domin_cover_max_pct`: percent-cover range represented by numeric Domin categories.
 - `presence_binary`: `1` means present, `0` means absent.
 - `raw_value`: original printed symbol or value.
 - `constancy_class`: summary column C, such as `II`, `III`, or `V`.
@@ -90,7 +95,7 @@ This is the plot/releve metadata file.
 Current shape:
 
 - 7 rows
-- 15 columns
+- 20 columns
 
 Each row means:
 
@@ -104,12 +109,16 @@ Important columns:
 - `releve_id`: plot number.
 - `ref_code`: original field/reference code.
 - `map_reference`: original map/grid reference.
+- `os_grid_square`: British National Grid square, such as `NG`.
+- `os_grid_reference`: full British National Grid reference.
+- `easting`, `northing`: British National Grid metre coordinates.
 - `latitude`, `longitude`: decimal-degree coordinates for GIS/maps. Leave blank until the map reference can be safely converted.
 - `altitude_ft`, `altitude_m`: elevation.
 - `aspect_deg`: slope direction.
 - `slope_deg`: slope steepness.
 - `cover_pct`: vegetation cover percentage.
 - `plot_area_m2`: plot size.
+- `species_reported`: number of species reported for this plot in the printed table.
 - `needs_review`: whether the plot row needs checking.
 - `note`: explanation if anything is uncertain.
 

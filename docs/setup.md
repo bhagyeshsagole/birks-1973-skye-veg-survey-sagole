@@ -200,6 +200,7 @@ Use this for:
 
 - species richness
 - abundance summaries
+- Domin-scale cover-range analysis
 - community composition
 - ordination
 - beta-diversity
@@ -218,6 +219,8 @@ one plot/releve
 Use this for:
 
 - map references
+- British National Grid references
+- easting/northing coordinates
 - latitude/longitude coordinates when available or safely converted
 - altitude
 - aspect
@@ -329,6 +332,30 @@ For a table with 25 species and 7 releves, the observation output should have ab
 ```
 
 If the output is much smaller, the prompt or extraction strategy needs work.
+
+### Coordinates Are Blank
+
+Coordinates need both:
+
+```text
+os_grid_square + map_reference
+```
+
+Example:
+
+```text
+NG + 504446 = NG504446
+```
+
+The script can convert that British National Grid reference into:
+
+```text
+easting, northing, latitude, longitude
+```
+
+If the grid square is missing or uncertain, leave coordinates blank until the reference can be checked.
+
+The coordinate conversion target is WGS84 latitude/longitude. Gavin identified the mapping framework as British National Grid / Ordnance Survey, and the BGS bulk-conversion reference documents British National Grid to WGS84-style coordinate transformation.
 
 ### Mac Is Slow Or Runs Out Of Memory
 

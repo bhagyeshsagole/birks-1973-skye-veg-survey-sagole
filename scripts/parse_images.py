@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import tempfile
 from io import StringIO
@@ -55,6 +56,10 @@ OBSERVATION_COLUMNS = [
     "releve_id",
     "ref_code",
     "map_reference",
+    "os_grid_square",
+    "os_grid_reference",
+    "easting",
+    "northing",
     "latitude",
     "longitude",
     "altitude_ft",
@@ -63,8 +68,11 @@ OBSERVATION_COLUMNS = [
     "slope_deg",
     "cover_pct",
     "plot_area_m2",
+    "species_reported",
     "species",
     "domin_value",
+    "domin_cover_min_pct",
+    "domin_cover_max_pct",
     "presence_binary",
     "raw_value",
     "constancy_class",
@@ -82,6 +90,10 @@ PLOT_COLUMNS = [
     "releve_id",
     "ref_code",
     "map_reference",
+    "os_grid_square",
+    "os_grid_reference",
+    "easting",
+    "northing",
     "latitude",
     "longitude",
     "altitude_ft",
@@ -90,6 +102,7 @@ PLOT_COLUMNS = [
     "slope_deg",
     "cover_pct",
     "plot_area_m2",
+    "species_reported",
     "needs_review",
     "note",
 ]
@@ -304,6 +317,189 @@ def normalize_cell(value: Any) -> str:
     return str(value).strip()
 
 
+def normalize_table_id(value: Any, fallback: str) -> str:
+    """Return table ids in a stable machine-readable form like table_4_1."""
+    text = normalize_cell(value).lower()
+    match = re.search(r"table\s+(\d+)\.(\d+)", text)
+    if match:
+        return f"table_{match.group(1)}_{match.group(2)}"
+
+    cleaned = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return cleaned or fallback
+
+
+def domin_cover_range(domin_value: str) -> tuple[str, str]:
+    """Convert Domin scale categories into approximate percent-cover ranges.
+
+    Values 1-10 follow the 10-point Domin scale Gavin provided. A period means
+    the species was not detected, so its cover range is 0-0. Presence-only
+    marks like x do not have a cover range, so those stay blank.
+    """
+    ranges = {
+        "1": ("0", "4"),
+        "2": ("0", "4"),
+        "3": ("0", "4"),
+        "4": ("4", "10"),
+        "5": ("10", "25"),
+        "6": ("25", "33"),
+        "7": ("33", "50"),
+        "8": ("50", "75"),
+        "9": ("75", "90"),
+        "10": ("90", "100"),
+        ".": ("0", "0"),
+    }
+    return ranges.get(domin_value.strip(), ("", ""))
+
+
+def normalize_os_grid_square(value: Any) -> str:
+    """Keep only a valid two-letter British National Grid square code."""
+    text = normalize_cell(value).upper().replace(" ", "")
+    return text if re.fullmatch(r"[A-HJ-Z]{2}", text) else ""
+
+
+def normalize_map_reference(value: Any) -> str:
+    """Keep map reference digits only, for example 504446."""
+    return re.sub(r"\D", "", normalize_cell(value))
+
+
+def build_os_grid_reference(os_grid_square: str, map_reference: str) -> str:
+    """Combine grid square and numeric reference, for example NG504446."""
+    if not os_grid_square or not map_reference:
+        return ""
+    return f"{os_grid_square}{map_reference}"
+
+
+def os_grid_to_easting_northing(os_grid_square: str, map_reference: str) -> tuple[str, str]:
+    """Convert a British National Grid reference into easting/northing metres.
+
+    The two-letter grid square gives the 100 km square. The numeric reference
+    gives the finer easting/northing inside that square. Six digits means
+    100 m precision, eight digits means 10 m precision, and ten digits means
+    1 m precision.
+    """
+    square = normalize_os_grid_square(os_grid_square)
+    digits = normalize_map_reference(map_reference)
+    if not square or len(digits) % 2 != 0 or len(digits) < 2:
+        return "", ""
+
+    letters = "ABCDEFGHJKLMNOPQRSTUVWXYZ"
+    first = letters.find(square[0])
+    second = letters.find(square[1])
+    if first < 0 or second < 0:
+        return "", ""
+
+    easting_100km = ((first - 2) % 5) * 5 + (second % 5)
+    northing_100km = 19 - (first // 5) * 5 - (second // 5)
+
+    half = len(digits) // 2
+    easting_digits = digits[:half]
+    northing_digits = digits[half:]
+    scale = 10 ** (5 - half)
+
+    easting = easting_100km * 100000 + int(easting_digits) * scale
+    northing = northing_100km * 100000 + int(northing_digits) * scale
+    return str(easting), str(northing)
+
+
+def osgb36_to_wgs84(easting: str, northing: str) -> tuple[str, str]:
+    """Convert British National Grid easting/northing to WGS84 lat/lon.
+
+    This is an offline implementation of the standard OSGB36 to WGS84
+    transformation, so the pipeline can run without calling an external API.
+    """
+    if not easting or not northing:
+        return "", ""
+
+    easting_float = float(easting)
+    northing_float = float(northing)
+
+    airy_a = 6377563.396
+    airy_b = 6356256.909
+    f0 = 0.9996012717
+    lat0 = math.radians(49)
+    lon0 = math.radians(-2)
+    n0 = -100000
+    e0 = 400000
+    e2 = 1 - (airy_b * airy_b) / (airy_a * airy_a)
+    n = (airy_a - airy_b) / (airy_a + airy_b)
+
+    lat = lat0
+    meridional_arc = 0.0
+    while northing_float - n0 - meridional_arc >= 0.00001:
+        lat = (northing_float - n0 - meridional_arc) / (airy_a * f0) + lat
+        ma = (1 + n + 1.25 * n**2 + 1.25 * n**3) * (lat - lat0)
+        mb = (3 * n + 3 * n**2 + 2.625 * n**3) * math.sin(lat - lat0) * math.cos(lat + lat0)
+        mc = (1.875 * n**2 + 1.875 * n**3) * math.sin(2 * (lat - lat0)) * math.cos(2 * (lat + lat0))
+        md = (35 / 24 * n**3) * math.sin(3 * (lat - lat0)) * math.cos(3 * (lat + lat0))
+        meridional_arc = airy_b * f0 * (ma - mb + mc - md)
+
+    sin_lat = math.sin(lat)
+    cos_lat = math.cos(lat)
+    nu = airy_a * f0 / math.sqrt(1 - e2 * sin_lat**2)
+    rho = airy_a * f0 * (1 - e2) / (1 - e2 * sin_lat**2) ** 1.5
+    eta2 = nu / rho - 1
+    tan_lat = math.tan(lat)
+    sec_lat = 1 / cos_lat
+    d_easting = easting_float - e0
+
+    vii = tan_lat / (2 * rho * nu)
+    viii = tan_lat / (24 * rho * nu**3) * (5 + 3 * tan_lat**2 + eta2 - 9 * tan_lat**2 * eta2)
+    ix = tan_lat / (720 * rho * nu**5) * (61 + 90 * tan_lat**2 + 45 * tan_lat**4)
+    x = sec_lat / nu
+    xi = sec_lat / (6 * nu**3) * (nu / rho + 2 * tan_lat**2)
+    xii = sec_lat / (120 * nu**5) * (5 + 28 * tan_lat**2 + 24 * tan_lat**4)
+    xiia = sec_lat / (5040 * nu**7) * (61 + 662 * tan_lat**2 + 1320 * tan_lat**4 + 720 * tan_lat**6)
+
+    osgb_lat = lat - vii * d_easting**2 + viii * d_easting**4 - ix * d_easting**6
+    osgb_lon = lon0 + x * d_easting - xi * d_easting**3 + xii * d_easting**5 - xiia * d_easting**7
+    wgs_lat, wgs_lon = helmert_osgb36_to_wgs84(osgb_lat, osgb_lon)
+    return f"{wgs_lat:.6f}", f"{wgs_lon:.6f}"
+
+
+def helmert_osgb36_to_wgs84(lat: float, lon: float) -> tuple[float, float]:
+    """Apply the OSGB36 to WGS84 Helmert transform."""
+    airy_a = 6377563.396
+    airy_b = 6356256.909
+    wgs_a = 6378137.0
+    wgs_b = 6356752.3141
+
+    x, y, z = lat_lon_to_cartesian(lat, lon, airy_a, airy_b)
+    tx, ty, tz = 446.448, -125.157, 542.060
+    rx = math.radians(0.1502 / 3600)
+    ry = math.radians(0.2470 / 3600)
+    rz = math.radians(0.8421 / 3600)
+    s = -20.4894 * 1e-6
+
+    x2 = tx + (1 + s) * x - rz * y + ry * z
+    y2 = ty + rz * x + (1 + s) * y - rx * z
+    z2 = tz - ry * x + rx * y + (1 + s) * z
+    return cartesian_to_lat_lon(x2, y2, z2, wgs_a, wgs_b)
+
+
+def lat_lon_to_cartesian(lat: float, lon: float, axis_a: float, axis_b: float) -> tuple[float, float, float]:
+    """Convert latitude/longitude radians to Cartesian x/y/z."""
+    e2 = 1 - (axis_b * axis_b) / (axis_a * axis_a)
+    nu = axis_a / math.sqrt(1 - e2 * math.sin(lat) ** 2)
+    x = nu * math.cos(lat) * math.cos(lon)
+    y = nu * math.cos(lat) * math.sin(lon)
+    z = (1 - e2) * nu * math.sin(lat)
+    return x, y, z
+
+
+def cartesian_to_lat_lon(x: float, y: float, z: float, axis_a: float, axis_b: float) -> tuple[float, float]:
+    """Convert Cartesian x/y/z to latitude/longitude decimal degrees."""
+    e2 = 1 - (axis_b * axis_b) / (axis_a * axis_a)
+    p = math.sqrt(x * x + y * y)
+    lat = math.atan2(z, p * (1 - e2))
+    previous_lat = 0.0
+    while abs(lat - previous_lat) > 1e-12:
+        previous_lat = lat
+        nu = axis_a / math.sqrt(1 - e2 * math.sin(lat) ** 2)
+        lat = math.atan2(z + e2 * nu * math.sin(lat), p)
+    lon = math.atan2(y, x)
+    return math.degrees(lat), math.degrees(lon)
+
+
 def clean_csv_response(text: str) -> str:
     """Remove markdown wrappers and keep the CSV-looking part of a response."""
     cleaned = text.strip()
@@ -405,6 +601,7 @@ def normalize_observation(
     plot_row = plots_by_releve.get(releve_id, {})
     raw_value = normalize_cell(raw_row.get("raw_value"))
     domin_value = normalize_cell(raw_row.get("domin_value"))
+    cover_min, cover_max = domin_cover_range(domin_value)
     presence = normalize_cell(raw_row.get("presence_binary"))
 
     # If the model forgets the presence flag, infer it from the extracted cell.
@@ -422,6 +619,10 @@ def normalize_observation(
         "releve_id": releve_id,
         "ref_code": plot_row.get("ref_code", ""),
         "map_reference": plot_row.get("map_reference", ""),
+        "os_grid_square": plot_row.get("os_grid_square", ""),
+        "os_grid_reference": plot_row.get("os_grid_reference", ""),
+        "easting": plot_row.get("easting", ""),
+        "northing": plot_row.get("northing", ""),
         "latitude": plot_row.get("latitude", ""),
         "longitude": plot_row.get("longitude", ""),
         "altitude_ft": plot_row.get("altitude_ft", ""),
@@ -430,8 +631,11 @@ def normalize_observation(
         "slope_deg": plot_row.get("slope_deg", ""),
         "cover_pct": plot_row.get("cover_pct", ""),
         "plot_area_m2": plot_row.get("plot_area_m2", ""),
+        "species_reported": plot_row.get("species_reported", ""),
         "species": normalize_cell(raw_row.get("species")),
         "domin_value": domin_value,
+        "domin_cover_min_pct": cover_min,
+        "domin_cover_max_pct": cover_max,
         "presence_binary": presence,
         "raw_value": raw_value,
         "constancy_class": normalize_cell(raw_row.get("constancy_class")),
@@ -448,20 +652,34 @@ def normalize_plot(
     image_file: str,
 ) -> dict[str, str]:
     """Turn one model plot object into one output/plots.csv row."""
+    map_reference = normalize_map_reference(raw_row.get("map_reference"))
+    os_grid_square = normalize_os_grid_square(raw_row.get("os_grid_square"))
+    os_grid_reference = build_os_grid_reference(os_grid_square, map_reference)
+    easting, northing = os_grid_to_easting_northing(os_grid_square, map_reference)
+    latitude = normalize_cell(raw_row.get("latitude"))
+    longitude = normalize_cell(raw_row.get("longitude"))
+    if not latitude and not longitude:
+        latitude, longitude = osgb36_to_wgs84(easting, northing)
+
     return {
         "table_id": table_id,
         "image_file": image_file,
         "releve_id": normalize_cell(raw_row.get("releve_id")),
         "ref_code": normalize_cell(raw_row.get("ref_code")),
-        "map_reference": normalize_cell(raw_row.get("map_reference")),
-        "latitude": normalize_cell(raw_row.get("latitude")),
-        "longitude": normalize_cell(raw_row.get("longitude")),
+        "map_reference": map_reference,
+        "os_grid_square": os_grid_square,
+        "os_grid_reference": os_grid_reference,
+        "easting": easting,
+        "northing": northing,
+        "latitude": latitude,
+        "longitude": longitude,
         "altitude_ft": normalize_cell(raw_row.get("altitude_ft")),
         "altitude_m": normalize_cell(raw_row.get("altitude_m")),
         "aspect_deg": normalize_cell(raw_row.get("aspect_deg")),
         "slope_deg": normalize_cell(raw_row.get("slope_deg")),
         "cover_pct": normalize_cell(raw_row.get("cover_pct")),
         "plot_area_m2": normalize_cell(raw_row.get("plot_area_m2")),
+        "species_reported": normalize_cell(raw_row.get("species_reported")),
         "needs_review": normalize_cell(raw_row.get("needs_review")),
         "note": normalize_cell(raw_row.get("note")),
     }
@@ -473,7 +691,7 @@ def normalize_table(
 ) -> dict[str, str]:
     """Turn table-level model metadata into one output/tables.csv row."""
     return {
-        "table_id": normalize_cell(raw_metadata.get("table_id")),
+        "table_id": normalize_table_id(raw_metadata.get("table_id"), Path(image_file).stem),
         "image_file": image_file,
         "class": normalize_cell(raw_metadata.get("class")),
         "order": normalize_cell(raw_metadata.get("order")),
@@ -640,6 +858,10 @@ def error_observation(image_path: Path, error: Exception) -> dict[str, str]:
         "releve_id": "",
         "ref_code": "",
         "map_reference": "",
+        "os_grid_square": "",
+        "os_grid_reference": "",
+        "easting": "",
+        "northing": "",
         "latitude": "",
         "longitude": "",
         "altitude_ft": "",
@@ -648,8 +870,11 @@ def error_observation(image_path: Path, error: Exception) -> dict[str, str]:
         "slope_deg": "",
         "cover_pct": "",
         "plot_area_m2": "",
+        "species_reported": "",
         "species": "PARSE_ERROR",
         "domin_value": "",
+        "domin_cover_min_pct": "",
+        "domin_cover_max_pct": "",
         "presence_binary": "",
         "raw_value": "",
         "constancy_class": "",

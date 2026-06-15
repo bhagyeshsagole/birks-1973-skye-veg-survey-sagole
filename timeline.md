@@ -218,4 +218,12 @@
 ## 28. Coordinate Columns
 - Added `latitude` and `longitude` columns to plot and observation outputs so map-ready coordinates can be stored next to `map_reference`.
 - Updated the parser schema and prompt to keep these fields blank unless coordinates are printed or can be safely converted from a complete grid reference.
-- Updated current CSVs: `output/output.csv` is now 175 rows by 26 columns, and `output/plots.csv` is now 7 rows by 15 columns.
+- Initial coordinate placeholder update made `output/output.csv` 175 rows by 26 columns and `output/plots.csv` 7 rows by 15 columns.
+
+## 29. Gavin Review Fixes
+- Added per-releve `species_reported` values so plot-specific richness is stored separately from the table-wide total species count.
+- Changed current prototype `table_id` to `table_4_1`.
+- Added British National Grid fields: `os_grid_square`, `os_grid_reference`, `easting`, and `northing`; current prototype uses `NG` plus the printed map reference.
+- Converted British National Grid easting/northing to WGS84 `latitude` and `longitude` offline in the parser.
+- Added Domin cover range columns: `domin_cover_min_pct` and `domin_cover_max_pct`.
+- Current CSVs after review fixes: `output/output.csv` is 175 rows by 33 columns, and `output/plots.csv` is 7 rows by 20 columns.
