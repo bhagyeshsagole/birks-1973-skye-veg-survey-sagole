@@ -240,3 +240,7 @@
 ## 32. Durable Unattended Parsing
 - Added per-image JSON status, a dedicated failure CSV, resume/retry controls, atomic saves after every image, clear terminal messages, and a final run summary.
 - Updated setup commands for a three-image test, full resume run, and explicit failed-image retries; ignored local Python virtual-environment folders.
+
+## 33. Full Batch Stopped
+- Started the 96-image unattended run and stopped it immediately when requested.
+- Saved result: 0 successful, 1 failed; image 2 was interrupted before status saving and remains available for resume.

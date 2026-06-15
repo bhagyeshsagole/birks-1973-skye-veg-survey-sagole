@@ -1,4 +1,14 @@
 {
-  "images": {},
+  "images": {
+    "images/Birks-HJB-1973-Present-Flora-Veg-Skye_1.png": {
+      "error_message": "The model response did not contain plots or observations.",
+      "filename": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_1.png",
+      "output_row_counts": {},
+      "result_status": "failed",
+      "skip_reason": "",
+      "status": "failed",
+      "timestamp": "2026-06-15T17:34:48+00:00"
+    }
+  },
   "version": 1
 }
