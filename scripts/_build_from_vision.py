@@ -21,7 +21,27 @@ try:  # noqa: SIM105
 except ImportError:
     TABLES_25_40 = []
 
-ALL_TABLES = TABLES + TABLES_25_40
+try:  # noqa: SIM105
+    from tables_data_39_50 import TABLES_39_50  # noqa: E402
+except ImportError:
+    TABLES_39_50 = []
+
+try:  # noqa: SIM105
+    from tables_data_51_60 import TABLES_51_60  # noqa: E402
+except ImportError:
+    TABLES_51_60 = []
+
+try:  # noqa: SIM105
+    from tables_data_61_65 import TABLES_61_65  # noqa: E402
+except ImportError:
+    TABLES_61_65 = []
+
+try:  # noqa: SIM105
+    from tables_data_66_70 import TABLES_66_70  # noqa: E402
+except ImportError:
+    TABLES_66_70 = []
+
+ALL_TABLES = TABLES + TABLES_25_40 + TABLES_39_50 + TABLES_51_60 + TABLES_61_65 + TABLES_66_70
 
 
 def cell_to_raw(cell: str) -> tuple[str, str]:
