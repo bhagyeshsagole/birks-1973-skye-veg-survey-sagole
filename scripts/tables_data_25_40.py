@@ -1,0 +1,486 @@
+"""Hand-read transcriptions for images 25-40.
+
+Each table has ordered releves plus species rows whose cells align to that
+order. Values are the printed Domin symbols: digits, ".", "+", or "x".
+"""
+
+NG = "NG"
+
+
+def releve(rid, ref, mapref, alt, asp, slope, cover, area, sprep):
+    return {
+        "releve_id": str(rid),
+        "ref_code": ref,
+        "map_reference": mapref,
+        "os_grid_square": NG,
+        "altitude_ft": str(alt),
+        "aspect_deg": str(asp),
+        "slope_deg": str(slope),
+        "cover_pct": str(cover),
+        "plot_area_m2": str(area),
+        "species_reported": str(sprep),
+    }
+
+
+def cells(text):
+    return text.split()
+
+
+def sp(name, text, c="", d="", needs_review=False, note=""):
+    row = {"name": name, "cells": cells(text), "C": c, "D": d}
+    if needs_review:
+        row["needs_review"] = True
+        row["note"] = note
+    return row
+
+
+TABLE_4_25_SPECIES = [
+    "Calluna vulgaris",
+    "Erica tetralix",
+    "Myrica gale",
+    "Equisetum palustre",
+    "Selaginella selaginoides",
+    "Festuca ovina",
+    "F. rubra",
+    "F. vivipara",
+    "Molinia caerulea",
+    "Carex demissa",
+    "C. dioica",
+    "C. echinata",
+    "C. flacca",
+    "C. hostiana",
+    "C. lepidocarpa",
+    "C. nigra",
+    "C. panicea",
+    "C. pulicaris",
+    "C. rostrata",
+    "Eleocharis palustris",
+    "E. quinqueflora",
+    "Eriophorum angustifolium",
+    "E. latifolium",
+    "Juncus articulatus",
+    "J. kochii",
+    "J. triglumis",
+    "Narthecium ossifragum",
+    "Potamogeton polygonifolius",
+    "Rhynchospora alba",
+    "Schoenus nigricans",
+    "Triglochin palustre",
+    "Drosera anglica",
+    "D. rotundifolia",
+    "Euphrasia scottica",
+    "Hypericum pulchrum",
+    "Menyanthes trifoliata",
+    "Pedicularis palustris",
+    "Pinguicula lusitanica",
+    "P. vulgaris",
+    "Plantago maritima",
+]
+
+
+_T425_C_LEFT = [
+    "II", "IV", "III", "II", "IV", "III", "", "", "III", "V",
+    "IV", "III", "IV", "V", "I", "III", "V", "III", "I", "I",
+    "V", "I", "V", "III", "III", "", "III", "III", "", "V",
+    "III", "III", "II", "III", "I", "I", "II", "II", "V", "I",
+]
+_T425_D_LEFT = [
+    "0.5", "1.4", "1.5", "0.9", "1.6", "1.3", "", "", "1.3", "3.1",
+    "1.8", "1.3", "2.0", "3.6", "0.9", "0.8", "3.5", "1.2", "0.7", "0.4",
+    "2.7", "0.2", "6.9", "1.8", "1.3", "", "0.9", "1.4", "", "5.4",
+    "0.7", "1.5", "0.8", "0.7", "0.2", "0.6", "0.4", "0.9", "2.1", "0.6",
+]
+_T425_C_MID = [
+    "I", "III", "III", "", "V", "", "", "", "III", "",
+    "II", "IV", "I", "II", "I", "III", "V", "I", "III", "I",
+    "III", "III", "II", "", "I", "", "III", "III", "II", "V",
+    "", "V", "IV", "", "", "II", "", "I", "V", "",
+]
+_T425_D_MID = [
+    "0.3", "1.1", "1.3", "", "2.0", "", "", "", "1.4", "",
+    "0.6", "1.9", "0.1", "0.7", "0.4", "1.4", "3.6", "0.1", "1.6", "0.3",
+    "1.6", "0.9", "0.9", "", "0.4", "", "1.6", "1.0", "0.4", "8.4",
+    "", "2.7", "1.7", "", "", "1.0", "", "0.1", "1.4", "",
+]
+_T425_D_RIGHT = [
+    "", "", "", "", "2.0", "1.5", "1.8", "3.3", "1.0", "4.0",
+    "1.0", "1.0", "4.3", "0.8", "0.5", "", "3.5", "2.3", "0.8", "",
+    "0.5", "0.3", "", "1.5", "", "2.0", "0.3", "", "", "2.3",
+    "", "0.3", "", "2.5", "0.3", "", "", "", "3.3", "0.3",
+]
+
+
+_T425_LEFT_CELLS = [
+    ". . . 3 . . . . + 2 .",
+    "2 . 2 3 . 1 2 1 3 1 .",
+    ". . 4 3 . . . . 2 4 4",
+    ". 2 . . . . . . 4 4 .",
+    "1 3 3 . . 1 2 3 2 . 3",
+    ". 2 . . 4 3 3 . . . 2",
+    ". . . . . . . . . . .",
+    ". . . . . . . . . . .",
+    ". . 3 2 . 2 . . . 3 4",
+    "3 4 5 3 3 2 3 3 3 2 3",
+    "2 2 . 2 4 3 2 2 . 3 .",
+    "2 . 4 2 . . . . . 4 2",
+    "3 3 5 4 3 . . . . 3 1",
+    "4 4 3 3 3 4 3 4 4 4 4",
+    ". 5 . . . . . . . . 5",
+    "1 . . + . 3 . . + 3 .",
+    "5 3 4 4 2 3 3 4 3 4 4",
+    ". 3 . 3 . 3 . . . 2 2",
+    ". . . . . . . . + 7 .",
+    ". . . . . . . . 5 . .",
+    "2 3 2 . . 4 4 3 6 3 3",
+    ". . . . . . 2 . . . .",
+    "7 8 6 7 8 6 6 8 7 7 6",
+    ". . 5 3 4 4 3 1 . . .",
+    "1 . 2 4 . . . 3 . 4 .",
+    ". . . . . . . . . . .",
+    ". . 1 3 . . 1 2 3 . 1",
+    "3 . 3 . . . 1 . 4 2 2",
+    ". . . . . . . . . . .",
+    "4 5 6 6 5 5 6 6 6 5 5",
+    ". 3 + . . 1 . . . 1 2",
+    ". . . . 3 3 3 4 . . 4",
+    ". . 3 . . . 1 3 2 . .",
+    ". 1 1 . . . 1 . . 3 2",
+    ". . 1 . . . . . . . 1",
+    ". . . . . . . . 5 + 1",
+    ". 2 1 . . . . . . . +",
+    ". . 3 . 3 . . . 4 . .",
+    "3 1 3 3 2 2 4 2 . 1 2",
+    ". 4 . . . . . . . . 3",
+]
+
+_T425_MID_CELLS = [
+    ". . . 2 . . .",
+    ". 1 . 2 . 1 4",
+    "2 3 . 4 . . .",
+    ". . . . . . .",
+    "2 4 1 2 3 2 .",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". 3 . 3 . 2 2",
+    ". . . . . . .",
+    ". . . 2 . 2 .",
+    "4 2 . 4 2 1 .",
+    ". . . . 1 . .",
+    ". 2 3 . . . .",
+    ". . 3 . . . .",
+    ". 4 2 4 . . .",
+    "4 3 3 4 4 4 3",
+    ". 1 . . . . .",
+    ". 2 4 5 . . .",
+    ". . 2 . . . .",
+    ". 2 2 . . 3 4",
+    ". . . 3 2 1 .",
+    "3 2 + . . . .",
+    ". . . . . . .",
+    ". . . 3 . . .",
+    ". . . . . . .",
+    ". . 2 3 3 . 3",
+    "3 . 2 . . 2 .",
+    ". 1 . + . 1 .",
+    "8 8 9 9 8 8 9",
+    ". . . . . . .",
+    "2 4 2 4 . 3 4",
+    ". . 2 3 3 2 2",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". 4 3 . . . .",
+    ". . . . . . .",
+    ". . . . . . 1",
+    "1 2 . 1 2 2 2",
+    ". . . . . . .",
+]
+
+_T425_RIGHT_CELLS = [
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    "2 3 . 3",
+    "3 . 3 .",
+    ". . 4 3",
+    "2 5 3 3",
+    ". 4 . .",
+    "3 2 5 6",
+    ". 1 3 .",
+    ". 2 2 .",
+    "5 3 4 5",
+    ". 3 . .",
+    "2 . . .",
+    ". . . .",
+    "3 3 4 4",
+    "2 4 3 .",
+    "3 . . .",
+    ". . . .",
+    ". 2 . .",
+    ". 1 . .",
+    ". . . .",
+    "2 4 . .",
+    ". . . .",
+    ". . 4 4",
+    ". 1 . .",
+    ". . . .",
+    ". . . .",
+    "4 5 . .",
+    ". . . .",
+    ". 1 . .",
+    ". . . .",
+    "2 4 1 3",
+    "1 . . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    "4 2 4 3",
+    "1 . . .",
+]
+
+
+TABLE_4_25A = {
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_25.png",
+    "table_id_raw": "Table 4.25",
+    "class": "SCHEUCHZERIO-CARICETEA FUSCAE",
+    "order": "TOFIELDIETALIA",
+    "alliance": "Eriophorion latifoliae",
+    "association": "Eriophorum latifolium-Carex hostiana",
+    "n_releves": "11",
+    "total_species": "98",
+    "mean_species": "",
+    "releves": [
+        releve(1, "B67-011", "555614", 350, 45, 5, 50, 4, 20),
+        releve(2, "B67-113", "507198", 100, 0, 10, 50, 4, 28),
+        releve(3, "B68-012", "587007", 200, 135, 10, 100, 4, 35),
+        releve(4, "B68-024", "472306", 300, 180, 5, 60, 4, 26),
+        releve(5, "B68-322", "753260", 200, 0, 5, 50, 4, 15),
+        releve(6, "B68-349", "412222", 150, 270, 3, 60, 4, 25),
+        releve(7, "B68-350", "412222", 150, 270, 3, 75, 4, 26),
+        releve(8, "B68-359", "415199", 250, 270, 10, 85, 4, 31),
+        releve(9, "B68-124", "503567", 700, 90, 5, 100, 4, 31),
+        releve(10, "B68-123", "502567", 750, 45, 5, 100, 4, 36),
+        releve(11, "B67-044", "601200", 150, 0, "", 70, 4, 50),
+    ],
+    "species": [
+        sp(name, cell_text, c, d)
+        for name, cell_text, c, d in zip(TABLE_4_25_SPECIES, _T425_LEFT_CELLS, _T425_C_LEFT, _T425_D_LEFT, strict=True)
+    ],
+}
+
+TABLE_4_25B = {
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_25.png",
+    "table_id_raw": "Table 4.25",
+    "class": "SCHEUCHZERIO-CARICETEA FUSCAE",
+    "order": "TOFIELDIETALIA",
+    "alliance": "Eriophorion latifoliae",
+    "association": "Schoenus nigricans",
+    "n_releves": "7",
+    "total_species": "98",
+    "mean_species": "",
+    "releves": [
+        releve(12, "B67-010", "555614", 350, 90, 5, 100, 4, 12),
+        releve(13, "B68-255", "605202", 50, "", "", 100, 4, 23),
+        releve(14, "B67-043", "602202", 50, "", "", 80, 4, 20),
+        releve(15, "B68-021", "472304", 250, "", "", 100, 4, 25),
+        releve(16, "B67-063", "528187", 750, 270, 5, 100, 4, 14),
+        releve(17, "B67-030", "707158", 100, 270, 2, 100, 4, 17),
+        releve(18, "B68-321", "753260", 200, 0, 5, 100, 4, 15),
+    ],
+    "species": [
+        sp(name, cell_text, c, d)
+        for name, cell_text, c, d in zip(TABLE_4_25_SPECIES, _T425_MID_CELLS, _T425_C_MID, _T425_D_MID, strict=True)
+    ],
+}
+
+TABLE_4_25C = {
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_25.png",
+    "table_id_raw": "Table 4.25",
+    "class": "SCHEUCHZERIO-CARICETEA FUSCAE",
+    "order": "TOFIELDIETALIA",
+    "alliance": "Eriophorion latifoliae",
+    "association": "Carex-Saxifraga aizoides nodum",
+    "n_releves": "4",
+    "total_species": "98",
+    "mean_species": "",
+    "releves": [
+        releve(19, "B67-073", "594200", 100, 0, 5, 40, 4, 30),
+        releve(20, "B68-234", "544215", 800, 135, 5, 60, 4, 28),
+        releve(21, "B68-109", "440690", 1550, 90, 5, 40, 4, 22),
+        releve(22, "B68-107", "440690", 1550, 90, 5, 60, 4, 22),
+    ],
+    "species": [
+        sp(name, cell_text, "", d)
+        for name, cell_text, d in zip(TABLE_4_25_SPECIES, _T425_RIGHT_CELLS, _T425_D_RIGHT, strict=True)
+    ],
+}
+
+
+TABLE_4_26_RELEVES = [
+    releve(1, "B67-079", "547183", 300, 225, 5, 100, 4, 26),
+    releve(2, "B67-112", "241531", 300, 315, 5, 100, 4, 20),
+    releve(3, "B68-087", "506557", 700, 45, 4, 100, 4, 19),
+    releve(4, "B68-180", "165543", 650, 45, 5, 100, 4, 18),
+    releve(5, "B68-333", "504286", 1300, 0, 5, 100, 4, 21),
+    releve(6, "B68-029", "500533", 1000, 90, 2, 100, 4, 21),
+    releve(7, "B68-009", "416182", 300, 90, 8, 90, 4, 23),
+    releve(8, "B67-023", "540208", 1400, 135, 10, 80, 4, 19),
+    releve(9, "B67-111", "241531", 300, 315, 5, 80, 4, 19),
+    releve(10, "B68-049", "438675", 950, "", "E.", 100, 4, 25),
+    releve(11, "B67-122", "435606", 1000, 0, 10, 100, 4, 26),
+    releve(12, "B68-332", "504286", 1200, 0, 15, 90, 4, 26),
+    releve(13, "B67-095", "657113", 400, 270, 10, 70, 4, 31),
+    releve(14, "B67-060", "752210", 1000, 225, 10, 70, 4, 31),
+]
+
+
+TABLE_4_26A = {
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_27.png",
+    "table_id_raw": "Table 4.26",
+    "class": "OXYCOCCO-SPHAGNETEA",
+    "order": "ERICETALIA TETRALICIS",
+    "alliance": "Ericion tetralicis",
+    "association": "Trichophoreto-Callunetum",
+    "n_releves": "14",
+    "total_species": "80",
+    "mean_species": "22.8",
+    "releves": TABLE_4_26_RELEVES,
+    "species": [
+        sp("Calluna vulgaris", "6 5 7 4 7 5 5 5 7 6 7 7 6 5", "V", "5.9"),
+        sp("Empetrum nigrum", ". . . 3 2 2 . . 2 . 3 . . 1", "III", "0.9"),
+        sp("Erica cinerea", ". . . . . . 4 . 2 2 . 4 2 .", "II", "1.0"),
+        sp("E. tetralix", "3 3 4 4 3 2 3 . 3 3 3 + 3 3", "V", "2.7"),
+        sp("Vaccinium myrtillus", ". . . . 1 2 . . . . 2 . . 2", "II", "0.5"),
+        sp("Lycopodium selago", ". . . . . . . . . 1 1 . . .", "I", "0.1"),
+        sp("Agrostis canina", ". . . . . . 1 . . . . 1 . .", "I", "0.1"),
+        sp("Molinia caerulea", "3 2 . 3 . 3 3 . 3 . . 2 4 .", "III", "1.6"),
+        sp("Nardus stricta", ". . . . 2 . . . . . . 2 . .", "I", "0.3"),
+        sp("Carex binervis", ". . . . . . . . 4 . . 1 + .", "II", "0.4"),
+        sp("C. echinata", "1 . . . 1 . . . 1 . . . . .", "II", "0.2"),
+        sp("C. nigra", ". 2 . . . 1 . . 1 . . . . .", "II", "0.3"),
+        sp("C. panicea", ". . . . . . 2 . 2 . . . . +", "II", "0.4"),
+        sp("C. rostrata", ". . 3 . . 2 . . . . . . . .", "I", "0.4"),
+        sp("*Dactylorchis maculata", ". + . . . . + . . . . . . .", "I", "0.1"),
+        sp("Eriophorum angustifolium", "3 3 3 4 3 3 . . 2 4 2 + . 3", "IV", "2.2"),
+        sp("E. vaginatum", "3 4 4 4 4 4 . . 5 . 2 . . 3", "IV", "2.4"),
+        sp("Juncus squarrosus", "3 2 . . 4 2 4 5 3 + 1 . 2 2", "IV", "2.1"),
+        sp("Narthecium ossifragum", "1 . 3 1 . + 3 . . 3 2 . . 2", "III", "1.1"),
+        sp("Trichophorum cespitosum", "8 6 7 7 7 7 7 8 8 8 6 8 8 7", "V", "7.3"),
+        sp("Drosera rotundifolia", ". . 1 2 . 3 . . . 2 . . . 1", "II", "0.6"),
+        sp("Pedicularis sylvatica", ". + . . . . 1 . . . . . 2 .", "II", "0.3"),
+        sp("Pinguicula vulgaris", ". . . 3 . . . 2 . 2 . . . .", "II", "0.5"),
+        sp("Polygala serpyllifolia", "+ 2 . . . . . 2 1 . . 1 . 2", "III", "0.6"),
+        sp("Potentilla erecta", "3 4 3 3 3 4 3 3 3 3 3 3 3 2", "V", "3.1"),
+        sp("Succisa pratensis", ". . . 1 . . . . . . . . 2 .", "II", "0.2"),
+        sp("Breutelia chrysocoma", "1 . . . . 1 . 2 . 2 1 . 1 .", "III", "0.6"),
+        sp("Campylopus atrovirens", "1 . 3 . . . 1 4 . . 1 2 . .", "III", "0.9"),
+        sp("‡C. flexuosus", "2 . + . . . 1 . . 1 . 3 1 .", "III", "0.9"),
+    ],
+}
+
+
+TABLE_4_26B = {
+    **{k: v for k, v in TABLE_4_26A.items() if k != "species"},
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_28.png",
+    "species": [
+        sp("Dicranum scoparium", "3 . . + . . . 1 . . . . 1 .", "II", "0.4"),
+        sp("†Hypnum cupressiforme", "3 . . . . 3 . 1 2 . 4 2 3 1", "III", "1.4"),
+        sp("Pleurozium schreberi", "2 . . + 2 . . 3 . 2 + . . .", "III", "0.8"),
+        sp("Polytrichum commune", ". . . . 3 + . . . . . . . .", "I", "0.3"),
+        sp("Rhacomitrium lanuginosum", "1 3 3 . . . 4 5 5 7 7 2 3 3", "IV", "3.1"),
+        sp("Rhytidiadelphus loreus", ". . . . 3 3 . . . . . . . .", "I", "0.4"),
+        sp("Sphagnum capillaceum", ". . . . . . . . 3 3 3 2 3 4", "III", "1.3"),
+        sp("S. compactum", "2 . . . . . . . . . . 3 1 2", "II", "0.6"),
+        sp("S. imbricatum", "+ . . . . . . . . . + . . .", "I", "0.1"),
+        sp("S. palustre", ". 3 . 5 5 3 . . . . 2 . . 3", "III", "1.3"),
+        sp("S. papillosum", ". 1 4 4 . . . 3 . . . . 1 .", "II", "0.9"),
+        sp("S. plumulosum", ". . 1 . . . . . . . 2 . . .", "I", "0.2"),
+        sp("S. rubellum", "4 3 4 3 6 5 . . . . . . 1 .", "III", "1.9"),
+        sp("S. tenellum", ". . 3 1 . . . . . 4 . . 2 1", "II", "0.8"),
+        sp("Cephalozia bicuspidata", ". . . . . . 2 . . . . 1 . .", "I", "0.2"),
+        sp("Diplophyllum albicans", ". . . . 1 . . . . 1 . 2 1 .", "II", "0.4"),
+        sp("Lepidozia setacea", ". . . . . . . . . . . 3 . 1", "I", "0.3"),
+        sp("Lophozia ventricosa", ". . . . 1 . . . . . . . . 1", "I", "0.1"),
+        sp("Mylia taylori", ". . . . 1 . 1 . . + . . 1 1", "II", "0.4"),
+        sp("Odontoschisma sphagni", "1 1 1 . . . 1 . . . 1 1 . .", "III", "0.4"),
+        sp("Pleurozia purpurea", ". . 2 . . . . . . 2 2 + . 1", "II", "0.6"),
+        sp("Scapania gracilis", ". . . . . . . . . . 1 . 2 .", "I", "0.2"),
+        sp("Cladonia arbuscula", ". . . . . . . . . 4 9 . 3 .", "II", "0.7"),
+        sp("C. coccifera", "1 . . . . . . . . 1 . 9 3 2", "II", "0.7"),
+        sp("C. uncialis", "1 1 . . . . . . . 9 3 . 3 3", "III", "1.0"),
+    ],
+}
+
+
+TABLE_4_27 = {
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_29.png",
+    "table_id_raw": "Table 4.27",
+    "class": "OXYCOCCO-SPHAGNETEA",
+    "order": "ERICETALIA TETRALICIS",
+    "alliance": "Ericion tetralicis",
+    "association": "Molinieto-Callunetum",
+    "n_releves": "9",
+    "total_species": "59",
+    "mean_species": "19.4",
+    "releves": [
+        releve(1, "B68-008", "416182", 300, 90, 12, 100, 4, 18),
+        releve(2, "B68-326", "492195", 150, 270, 15, 100, 4, 20),
+        releve(3, "B67-050", "437257", 400, 270, 15, 100, 4, 17),
+        releve(4, "B67-052", "441256", 650, 225, 15, 100, 4, 15),
+        releve(5, "B67-084", "516193", 300, 270, 15, 100, 4, 16),
+        releve(6, "B67-088", "512199", 200, 270, 12, 100, 4, 26),
+        releve(7, "B67-080", "542185", 250, 270, 15, 100, 4, 18),
+        releve(8, "B67-027", "370305", 500, 225, 5, 100, 4, 24),
+        releve(9, "B68-181", "165543", 650, 45, 5, 100, 4, 21),
+    ],
+    "species": [
+        sp("Calluna vulgaris", "5 5 5 5 6 6 5 8 7", "V", "5.8"),
+        sp("Empetrum nigrum", ". . . . . . . 2 3", "II", "0.6"),
+        sp("Erica cinerea", "2 . . 1 . 2 . . .", "II", "0.6"),
+        sp("E. tetralix", ". 4 3 3 1 3 2 2 4", "V", "2.4"),
+        sp("Myrica gale", ". 3 . 2 . . . . .", "II", "0.6"),
+        sp("Deschampsia flexuosa", ". . . . 1 . 3 . .", "II", "0.4"),
+        sp("Molinia caerulea", "7 8 8 6 7 6 8 5 7", "V", "6.9"),
+        sp("Carex echinata", "2 2 . . . . 2 . .", "II", "0.7"),
+        sp("*Dactylorchis maculata", "1 . . . . . . . 1", "II", "0.2"),
+        sp("Eriophorum vaginatum", "3 . . . . . . 3 3", "II", "1.0"),
+        sp("Juncus squarrosus", ". . 1 1 . 3 . 1 +", "III", "0.8"),
+        sp("Narthecium ossifragum", "3 3 2 3 2 3 3 . 3", "V", "2.4"),
+        sp("Schoenus nigricans", ". 1 . . . 1 . . .", "II", "0.2"),
+        sp("Trichophorum cespitosum", "3 2 3 2 2 3 3 1 .", "V", "2.1"),
+        sp("Drosera rotundifolia", "2 1 . . . 2 . . 2", "III", "0.8"),
+        sp("Pedicularis sylvatica", "2 . 2 2 + 2 2 . .", "IV", "1.2"),
+        sp("Polygala serpyllifolia", ". . 1 2 . 2 . 2 .", "III", "0.8"),
+        sp("Potentilla erecta", "3 2 3 3 3 3 3 3 4", "V", "3.0"),
+        sp("Succisa pratensis", ". 2 . . . . . . +", "II", "0.3"),
+        sp("Breutelia chrysocoma", ". 1 . . . . + 1 .", "II", "0.3"),
+        sp("†Campylopus atrovirens", ". 4 2 . 1 3 1 . .", "III", "1.2"),
+        sp("Hylocomium splendens", ". . . . . . . 4 3", "II", "0.8"),
+        sp("‡Hypnum cupressiforme", ". . . . . . . 2 1", "II", "0.3"),
+        sp("Rhacomitrium lanuginosum", ". 3 3 4 2 2 1 . .", "IV", "1.7"),
+        sp("Sphagnum capillaceum", "4 . . . . . 4 5 2", "III", "1.7"),
+        sp("S. compactum", ". 3 3 . 1 1 . . .", "III", "0.9"),
+        sp("S. imbricatum", ". . + . . + . . .", "II", "0.2"),
+        sp("S. palustre", ". . . . . . 2 3 1", "II", "0.7"),
+        sp("S. papillosum", "3 . . . . . . 3 .", "II", "0.7"),
+        sp("S. plumulosum", "2 . . . . 2 . . .", "II", "0.4"),
+        sp("S. recurvum", ". . . . . . 2 3 .", "II", "0.6"),
+        sp("S. strictum", ". 2 . . 2 + . . 3", "III", "0.9"),
+        sp("S. tenellum", ". . 1 1 . 1 . 4 .", "III", "0.8"),
+        sp("Pleurozia purpurea", ". 3 2 2 3 2 1 . 1", "IV", "1.6"),
+        sp("Cladonia arbuscula", ". 3 . . . 1 . 2 .", "II", "0.7"),
+        sp("C. impexa", ". . . 1 2 . 1 . .", "II", "0.4"),
+        sp("C. uncialis", ". 2 . . 3 + . 2 .", "III", "0.9"),
+    ],
+}
+
+
+TABLES_25_40 = [
+    TABLE_4_25A,
+    TABLE_4_25B,
+    TABLE_4_25C,
+    TABLE_4_26A,
+    TABLE_4_26B,
+    TABLE_4_27,
+]

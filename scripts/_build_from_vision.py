@@ -14,7 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import parse_images as P  # noqa: E402
-from tables_data import TABLES  # noqa: E402
+from tables_data import NON_OBSERVATION_IMAGES, TABLES  # noqa: E402
+
+try:  # noqa: SIM105
+    from tables_data_25_40 import TABLES_25_40  # noqa: E402
+except ImportError:
+    TABLES_25_40 = []
+
+ALL_TABLES = TABLES + TABLES_25_40
 
 
 def cell_to_raw(cell: str) -> tuple[str, str]:
@@ -27,7 +34,7 @@ def cell_to_raw(cell: str) -> tuple[str, str]:
 
 def build_observation_rows() -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    for t in TABLES:
+    for t in ALL_TABLES:
         image_file = t["image"]
         table_row = P.normalize_table(
             {
@@ -119,6 +126,11 @@ def main() -> None:
     image_notes = {
         13: "Transcribed from scan; table 4.13 releve 5 printed total is one higher than visible entries.",
         15: "Transcribed from scan; chemistry-only Table 4.16 not included in species output.",
+        17: "Transcribed from scan; table 4.17 releve 5 printed total is one higher than visible entries.",
+        19: "Transcribed from scan; table 4.19 releves 7-8 have visible plus marks that make counts one higher than printed totals.",
+        20: "Transcribed from scan; table 4.20 visible entries put releve 3 one below and releve 4 one above printed totals.",
+        22: "Transcribed from scan; table 4.22 visible entries put releve 5 one above the printed total.",
+        24: "Transcribed from scan; table 4.24 has unresolved count mismatches in releves 1, 3, and 5.",
     }
     tracking_rows = []
     for idx, img in enumerate(images, start=1):
@@ -130,16 +142,18 @@ def main() -> None:
             status, note = "successful", "Transcribed from scan; rotated multi-column page, some cells flagged for review."
         elif n_obs:
             status, note = "successful", image_notes.get(idx, "Transcribed from scan.")
+        elif idx in NON_OBSERVATION_IMAGES:
+            status, note = "successful", NON_OBSERVATION_IMAGES[idx]
         else:
             status, note = "pending", ""
         tracking_rows.append({
             "image_file": image_file,
             "image_number": str(idx),
             "status": status,
-            "last_attempt_at": P.utc_timestamp() if n_obs else "",
+            "last_attempt_at": P.utc_timestamp() if n_obs or idx in NON_OBSERVATION_IMAGES else "",
             "error_type": "",
             "error_message": "",
-            "observations_added": str(n_obs) if n_obs else "",
+            "observations_added": str(n_obs) if n_obs or idx in NON_OBSERVATION_IMAGES else "",
             "plots_detected": "",
             "tables_detected": "",
             "note": note,
