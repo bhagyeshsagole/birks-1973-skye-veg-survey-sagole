@@ -34,6 +34,13 @@ def sp(name, text, c="", d="", needs_review=False, note=""):
     return row
 
 
+def sparse_sp(name, n_releves, entries):
+    row = ["."] * n_releves
+    for releve_id, value in entries.items():
+        row[releve_id - 1] = str(value)
+    return {"name": name, "cells": row}
+
+
 TABLE_4_25_SPECIES = [
     "Calluna vulgaris",
     "Erica tetralix",
@@ -317,6 +324,230 @@ TABLE_4_25C = {
 }
 
 
+TABLE_4_25_CONT_SPECIES = [
+    "Potentilla erecta",
+    "Ranunculus flammula",
+    "Saxifraga aizoides",
+    "Succisa pratensis",
+    "Thalictrum alpinum",
+    "Thymus drucei",
+    "Utricularia minor",
+    "Acrocladium sarmentosum",
+    "A. trifarium",
+    "Blindia acuta",
+    "Breutelia chrysocoma",
+    "Bryum pseudotriquetrum",
+    "Campylium stellatum",
+    "Cinclidium stygium",
+    "Cratoneuron commutatum",
+    "Ctenidium molluscum",
+    "*Drepanocladus revolvens",
+    "Fissidens adianthoides",
+    "Scorpidium scorpioides",
+    "Sphagnum contortum",
+    "S. plumulosum",
+    "†S. subsecundum",
+    "Splachnum ampullaceum",
+    "Tortella tortuosa",
+    "Pellia epiphylla",
+    "Riccardia pinguis",
+]
+
+_T425_CONT_C_LEFT = [
+    "I", "I", "", "IV", "I", "", "II", "I", "I", "IV", "II", "II", "V",
+    "I", "I", "II", "III", "II", "V", "II", "I", "III", "II", "I", "II", "III",
+]
+_T425_CONT_D_LEFT = [
+    "0.3", "0.3", "", "1.1", "0.2", "", "0.3", "0.3", "0.5", "1.5", "0.5",
+    "0.8", "3.9", "0.5", "0.8", "0.8", "1.9", "0.5", "4.4", "0.5", "0.2",
+    "1.1", "0.3", "0.2", "0.3", "0.5",
+]
+_T425_CONT_C_MID = [
+    "I", "", "", "II", "", "", "III", "", "", "I", "I", "", "V",
+    "", "", "", "II", "", "V", "I", "", "V", "", "", "I", "",
+]
+_T425_CONT_D_MID = [
+    "0.1", "", "", "0.1", "", "", "0.9", "", "", "0.1", "0.1", "", "3.7",
+    "", "", "", "0.6", "", "4.1", "0.6", "", "2.4", "", "", "0.1", "",
+]
+_T425_CONT_D_RIGHT = [
+    "", "1.5", "6.8", "", "1.8", "1.0", "", "", "", "4.5", "", "1.0", "4.0",
+    "", "2.5", "1.3", "3.0", "0.5", "3.0", "", "", "", "", "", "", "1.5",
+]
+
+_T425_CONT_LEFT_CELLS = [
+    ". . . . . . . 1 . 2 .",
+    ". . 2 . . . . . . 1 .",
+    ". . . . . . . . . . .",
+    ". 3 2 + . . 1 3 . 1 +",
+    ". . . . . . . . . . 2",
+    ". . . . . . . . . . .",
+    "+ . + . . . + . . . .",
+    ". . . . . 2 . . + . .",
+    "3 . . 3 . . . . . . .",
+    ". 2 + 2 3 1 3 3 . . +",
+    ". . . . . . 2 2 1 . .",
+    ". . 3 2 . . 1 . . . 3",
+    "3 3 4 4 4 4 4 4 4 5 4",
+    ". 2 . . . . . . . . 4",
+    ". 6 . . . . . . . . 3",
+    ". . 2 . . . . 3 . 1 3",
+    ". 2 4 . . 3 . + 3 4 4",
+    ". 2 . . . . . . . 3 1",
+    "6 6 4 5 2 5 4 4 4 3 5",
+    ". . + . . . . + + + 2",
+    ". . . . . . . + + . .",
+    "3 . . 2 . . . 1 5 1 .",
+    ". . . . . 1 1 1 . . .",
+    ". . . . . . . 1 . . .",
+    ". . . . . . . 1 1 1 1",
+    ". . 1 1 . 1 . 2 . . .",
+]
+
+_T425_CONT_MID_CELLS = [
+    ". . . . 1 . .",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". 1 . . . . 1",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". 3 . 2 . . 1",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". . . . 1 . .",
+    ". . . 1 . . .",
+    ". . . . . . .",
+    "4 3 4 3 4 3 5",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". . 2 2 . . .",
+    ". . . . . . .",
+    "3 6 5 3 5 4 3",
+    ". . 4 . . . .",
+    ". . . . . . .",
+    "2 4 5 3 2 1 .",
+    ". . . . . . .",
+    ". . . . . . .",
+    ". . . + . . 1",
+    ". . . . . . .",
+]
+
+_T425_CONT_RIGHT_CELLS = [
+    ". . . .",
+    ". . 3 3",
+    "5 8 7 7",
+    "1 . . .",
+    "2 . 2 3",
+    "3 1 . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    "3 3 6 6",
+    ". . . .",
+    "2 1 . .",
+    "4 3 5 4",
+    ". . . .",
+    "4 5 . 1",
+    "3 . . 2",
+    "4 3 4 1",
+    ". 2 . .",
+    "2 5 3 2",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    ". . . .",
+    "1 1 2 2",
+]
+
+TABLE_4_25D = {
+    **{k: v for k, v in TABLE_4_25A.items() if k != "species"},
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_26.png",
+    "mean_species": "29.4",
+    "species": [
+        sp(name, cell_text, c, d)
+        for name, cell_text, c, d in zip(
+            TABLE_4_25_CONT_SPECIES,
+            _T425_CONT_LEFT_CELLS,
+            _T425_CONT_C_LEFT,
+            _T425_CONT_D_LEFT,
+            strict=True,
+        )
+    ]
+    + [
+        sparse_sp("Mnium undulatum", 11, {2: "2"}),
+        sparse_sp("Chara spp.", 11, {2: "4"}),
+        sparse_sp("Prunella vulgaris", 11, {3: "1"}),
+        sparse_sp("Splachnum sphaericum", 11, {6: "1"}),
+        sparse_sp("Riccardia multifida", 11, {8: "1"}),
+        sparse_sp("Empetrum nigrum", 11, {9: "+"}),
+        sparse_sp("Carex limosa", 11, {9: "3"}),
+        sparse_sp("Sphagnum palustre", 11, {9: "1"}),
+        sparse_sp("Carex curta", 11, {10: "1"}),
+        sparse_sp("Sphagnum warnstorfianum", 11, {10: "1"}),
+        sparse_sp("Dactylorchis purpurella", 11, {11: "1"}),
+        sparse_sp("Plagiothecium bifolium", 11, {11: "1"}),
+        sparse_sp("Linum catharticum", 11, {11: "+"}),
+        sparse_sp("Acrocladium cuspidatum", 11, {11: "1"}),
+        sparse_sp("Barbula fallax", 11, {11: "+"}),
+        sparse_sp("Cratoneuron filicinum", 11, {11: "1"}),
+        sparse_sp("Mnium seligeri", 11, {11: "+"}),
+        sparse_sp("Orthothecium rufescens", 11, {11: "2"}),
+        sparse_sp("Philonotis calcarea", 11, {11: "2"}),
+        sparse_sp("Pseudoscleropodium purum", 11, {11: "1"}),
+        sparse_sp("Leiocolea bantriensis", 11, {11: "2"}),
+        sparse_sp("L. muelleri", 11, {11: "2"}),
+        sparse_sp("Scapania aspera", 11, {11: "2"}),
+    ],
+}
+
+TABLE_4_25E = {
+    **{k: v for k, v in TABLE_4_25B.items() if k != "species"},
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_26.png",
+    "mean_species": "18.0",
+    "species": [
+        sp(name, cell_text, c, d)
+        for name, cell_text, c, d in zip(
+            TABLE_4_25_CONT_SPECIES,
+            _T425_CONT_MID_CELLS,
+            _T425_CONT_C_MID,
+            _T425_CONT_D_MID,
+            strict=True,
+        )
+    ]
+    + [
+        sparse_sp("Pleurozium commune", 7, {2: "+"}),
+    ],
+}
+
+TABLE_4_25F = {
+    **{k: v for k, v in TABLE_4_25C.items() if k != "species"},
+    "image": "images/Birks-HJB-1973-Present-Flora-Veg-Skye_26.png",
+    "mean_species": "25.5",
+    "species": [
+        sp(name, cell_text, "", d)
+        for name, cell_text, d in zip(
+            TABLE_4_25_CONT_SPECIES,
+            _T425_CONT_RIGHT_CELLS,
+            _T425_CONT_D_RIGHT,
+            strict=True,
+        )
+    ]
+    + [
+        sparse_sp("Dryas octopetala", 4, {1: "2"}),
+        sparse_sp("Parnassia palustris", 4, {1: "1"}),
+        sparse_sp("Gymnostomum recurvirostrum", 4, {1: "2"}),
+        sparse_sp("Juncus biglumis", 4, {3: "+"}),
+        sparse_sp("Lotus corniculatus", 4, {3: "3"}),
+        sparse_sp("Viola riviniana", 4, {4: "2"}),
+        sparse_sp("Anthelia julacea", 4, {4: "2"}),
+        sparse_sp("Riccardia sinuata", 4, {4: "+"}),
+    ],
+}
+
+
 TABLE_4_26_RELEVES = [
     releve(1, "B67-079", "547183", 300, 225, 5, 100, 4, 26),
     releve(2, "B67-112", "241531", 300, 315, 5, 100, 4, 20),
@@ -480,6 +711,9 @@ TABLES_25_40 = [
     TABLE_4_25A,
     TABLE_4_25B,
     TABLE_4_25C,
+    TABLE_4_25D,
+    TABLE_4_25E,
+    TABLE_4_25F,
     TABLE_4_26A,
     TABLE_4_26B,
     TABLE_4_27,
