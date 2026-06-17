@@ -349,3 +349,47 @@
 - **Image 67 — Table 4.49 map references:** The Map Reference row of Table 4.49 (image 67) could not be read reliably enough to trust the coordinate values. The current Table 4.49 transcription uses unverified map references; any spatial analysis using Table 4.49 plot locations should treat those coordinates as provisional.
 - **Tables 4.50 and 4.51 (images 66, 69):** Species lists are partially captured (~23 of 42 and ~21 of 43 species respectively) but all abundance cell values are unreadable from the rotated scans. These rows are included for completeness but should not be used for abundance analysis.
 - **Overall confidence:** Species name transcription across the 96 images is high-fidelity; Birks used standard Latin binomials consistent with 1970s British botanical nomenclature, and names were cross-checked during transcription. Domin abundance values are reliable for portrait-orientation tables (images 2-65 minus the flagged exceptions above). Coordinates are accurate for the 95% of rows with populated lat/lon where the map reference was clearly printed and readable.
+
+## 48. Images With `needs_review=True` Rows — Full List
+- 5,847 rows across 30 source images carry `needs_review=True` (20.3% of 28,856 total).
+- The flag is set at the species-observation level, not the image level, so an image with mixed reliable and uncertain cells will have both `True` and `False` rows.
+
+| Image | Table | Review rows | Primary reason |
+|---|---|---|---|
+| 8 | 4.8 | 676 | Rotated landscape scan (~26 releve columns); abundance cells uncertain |
+| 40 | 4.34 | 85 | Sparse matrix; some presence marks uncertain |
+| 41 | 4.35 | 144 | Sparse matrix |
+| 42 | 4.35 | 180 | Continuation page; cells approximate |
+| 43 | 4.36 | 255 | Sparse matrix |
+| 44 | 4.36 | 323 | Sparse matrix; some duplicates uncertain |
+| 45 | 4.37 | 280 | Sparse matrix |
+| 46 | 4.37 | 84 | Sparse matrix; continuation page |
+| 47 | 4.38 | 132 | Sparse matrix; continuation page |
+| 48 | 4.38 | 220 | Last releve value uncertain from scan |
+| 49 | 4.40 | 930 | Wide rotated scan; all cells transcribed at best effort |
+| 50 | 4.40 | 930 | Wide rotated scan (continuation); all cells at best effort |
+| 51 | 4.41 | 108 | Sparse matrix |
+| 52 | 4.42 | 56 | Sparse matrix |
+| 53 | 4.43 | 182 | Cells approximate |
+| 54 | 4.43 | 126 | Sparse matrix |
+| 56 | 4.44 | 48 | Sparse matrix |
+| 57 | 4.39 | 110 | Sparse matrix |
+| 58 | 4.45 | 35 | Sparse matrix |
+| 59 | 4.46 | 42 | Sparse matrix |
+| 60 | 4.46 | 84 | Sparse matrix |
+| 61 | 4.47 | 14 | Association 2 cells approximate |
+| 62 | 4.47 | 56 | Association 2 cells illegible; C/D uncertain |
+| 63 | 4.47 | 42 | Values hard to read; one species name uncertain |
+| 64 | 4.47 | 28 | Cells largely absent in assoc 1; species name partially legible |
+| 65 | 4.48 | 3 | Three additional species from footnote; names approximate |
+| 66 | 4.50 | 322 | Rotated landscape scan; cells at best effort |
+| 67 | 4.49 | 78 | Sparse matrix; C/D values approximate |
+| 68 | 4.49 | 13 | Species name partially legible |
+| 69 | 4.51 | 231 | Rotated landscape scan; cells at best effort |
+| 70 | 4.52 | 30 | Sparse matrix; two uncertain species names |
+
+- The two largest blocks (images 49/50, Table 4.40: 1,860 rows combined) are a wide rotated table where column alignment cannot be verified from the available scan — these should be treated as provisional.
+- Images 66 and 69 (Tables 4.50/4.51) are rotated landscape pages where species list is partial and cell values could not be read reliably.
+- Images 41-48 and 51-60 (Tables 4.35–4.46) have sparse matrices where some cells are hard to distinguish from blank; the species names are reliable but individual Domin values may be off by 1.
+- Images 61-64 (Table 4.47) have a two-association layout where the second association's cells were difficult to read; flagged rows should be spot-checked against the original scan.
+- To find all flagged rows in Python: `df[df['needs_review'] == 'True']` on `output/output.csv`.
