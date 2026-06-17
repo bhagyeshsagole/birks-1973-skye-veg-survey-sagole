@@ -12,6 +12,29 @@ NG = "NG"
 
 NON_OBSERVATION_IMAGES = {
     16: "Handled; Table 4.16 is a chemistry-only continuation with no species-by-releve matrix.",
+    31: "Handled; scan is severely damaged and illegible — page content cannot be reliably transcribed.",
+    75: "Handled; Table 4.57 is a synoptic constancy table (~330 species × 55 community columns); not a species-by-releve plot matrix.",
+    76: "Handled; Table 4.57 continued (synoptic constancy table).",
+    77: "Handled; Table 4.57 continued (synoptic constancy table).",
+    78: "Handled; Table 4.57 continued (synoptic constancy table).",
+    79: "Handled; Table 4.57 continued (synoptic constancy table).",
+    80: "Handled; Table 4.57 continued (synoptic constancy table).",
+    81: "Handled; Table 4.57 continued (synoptic constancy table).",
+    82: "Handled; Table 4.57 continued (synoptic constancy table).",
+    83: "Handled; Table 4.57 continued (synoptic constancy table).",
+    84: "Handled; Table 4.57 continued (synoptic constancy table).",
+    85: "Handled; Table 4.57 continued (synoptic constancy table).",
+    86: "Handled; Table 4.57 continued (synoptic constancy table).",
+    87: "Handled; Table 4.57 continued (synoptic constancy table).",
+    88: "Handled; Table 4.57 continued (synoptic constancy table).",
+    89: "Handled; Table 4.57 continued (synoptic constancy table).",
+    90: "Handled; Table 4.57 continued (synoptic constancy table).",
+    91: "Handled; Table 4.57 continued (synoptic constancy table).",
+    92: "Handled; Table 4.57 continued (synoptic constancy table).",
+    93: "Handled; Table 4.57 continued (synoptic constancy table).",
+    94: "Handled; Table 4.57 continued (synoptic constancy table).",
+    95: "Handled; Table 4.57 continued (synoptic constancy table).",
+    96: "Handled; Table 4.57 continued (synoptic constancy table).",
 }
 
 

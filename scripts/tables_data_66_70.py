@@ -66,22 +66,29 @@ TABLE_4_50 = {
     "n_releves": "14",
     "total_species": "42",
     "mean_species": "18.5",
+    "notes": (
+        "Rotated landscape scan (image 66). Releve reference codes, map references, "
+        "altitude, aspect, and slope could not be reliably read from the rotated scan "
+        "and are omitted here (left blank to avoid false coordinates). Species list is "
+        "partial (~23 of 42 total species captured); individual cell values unreadable "
+        "from rotated scan."
+    ),
     "low_confidence": True,
     "releves": [
-        releve(1,  "B68-001", "001332", 100, 0,   8,  100, 10, 17),
-        releve(2,  "B68-002", "332332", 100, 0,   8,  100, 10, 27),
-        releve(3,  "B67-003", "001332", 100, 0,   8,  100, 10, 22),
-        releve(4,  "B68-004", "332001", 200, 0,   5,  100, 10, 22),
-        releve(5,  "B68-005", "001001", 200, 0,   5,  100, 10, 22),
-        releve(6,  "B68-006", "332560", 200, 0,   5,  100, 10, 22),
-        releve(7,  "B68-007", "560332", 200, 0,   5,  100, 10, 17),
-        releve(8,  "B68-008", "560560", 200, 0,   5,  100, 10, 15),
-        releve(9,  "B68-009", "560001", 200, 0,   5,  100, 10, 16),
-        releve(10, "B68-010", "001560", 200, 0,   10, 100, 10, 18),
-        releve(11, "B67-011", "560001", 200, 0,   10, 100, 10, 18),
-        releve(12, "B68-012", "001001", 200, 0,   10, 100, 10, 18),
-        releve(13, "B68-013", "332332", 200, 0,   10, 100, 10, 18),
-        releve(14, "B67-014", "560560", 200, 0,   10, 100, 10, 16),
+        releve(1,  "", "", "", "", "", 100, 10, ""),
+        releve(2,  "", "", "", "", "", 100, 10, ""),
+        releve(3,  "", "", "", "", "", 100, 10, ""),
+        releve(4,  "", "", "", "", "", 100, 10, ""),
+        releve(5,  "", "", "", "", "", 100, 10, ""),
+        releve(6,  "", "", "", "", "", 100, 10, ""),
+        releve(7,  "", "", "", "", "", 100, 10, ""),
+        releve(8,  "", "", "", "", "", 100, 10, ""),
+        releve(9,  "", "", "", "", "", 100, 10, ""),
+        releve(10, "", "", "", "", "", 100, 10, ""),
+        releve(11, "", "", "", "", "", 100, 10, ""),
+        releve(12, "", "", "", "", "", 100, 10, ""),
+        releve(13, "", "", "", "", "", 100, 10, ""),
+        releve(14, "", "", "", "", "", 100, 10, ""),
     ],
     "species": [
         # All cells uncertain (rotated scan) — marked needs_review
@@ -316,19 +323,27 @@ TABLE_4_51 = {
     "n_releves": "11",
     "total_species": "43",
     "mean_species": "12.8",
+    "notes": (
+        "Rotated landscape scan (image 69). Releve reference codes, map references, "
+        "altitude, aspect, and slope could not be reliably read from the rotated scan "
+        "and are omitted here (left blank to avoid false coordinates). Species list is "
+        "partial (~21 of 43 total species captured); individual cell values unreadable "
+        "from rotated scan. Localities from footnote: 1 Loch Eyre; 2-5 E. side Loch na "
+        "Dal; 6-10 Tokavaig; 11-12 near Allt Strollamus."
+    ),
     "low_confidence": True,
     "releves": [
-        releve(1,  "B68-001", "001560", 100, 0,   8,  100, 4, 13),
-        releve(2,  "B67-002", "332560", 100, 0,   8,  100, 4, 13),
-        releve(3,  "B68-003", "560332", 100, 0,   8,  100, 4, 13),
-        releve(4,  "B68-004", "560001", 200, 0,   5,  100, 4, 13),
-        releve(5,  "B68-005", "001332", 200, 0,   5,  100, 4, 7),
-        releve(6,  "B68-006", "332001", 200, 0,   5,  100, 4, 16),
-        releve(7,  "B68-007", "001001", 200, 0,   5,  100, 4, 15),
-        releve(8,  "B68-008", "332332", 200, 0,   5,  100, 4, 10),
-        releve(9,  "B67-009", "560560", 200, 0,   5,  100, 4, 16),
-        releve(10, "B68-010", "001332", 200, 0,   10, 100, 4, 12),
-        releve(11, "B67-011", "332560", 200, 0,   10, 100, 4, 17),
+        releve(1,  "", "", "", "", "", 100, 4, ""),
+        releve(2,  "", "", "", "", "", 100, 4, ""),
+        releve(3,  "", "", "", "", "", 100, 4, ""),
+        releve(4,  "", "", "", "", "", 100, 4, ""),
+        releve(5,  "", "", "", "", "", 100, 4, ""),
+        releve(6,  "", "", "", "", "", 100, 4, ""),
+        releve(7,  "", "", "", "", "", 100, 4, ""),
+        releve(8,  "", "", "", "", "", 100, 4, ""),
+        releve(9,  "", "", "", "", "", 100, 4, ""),
+        releve(10, "", "", "", "", "", 100, 4, ""),
+        releve(11, "", "", "", "", "", 100, 4, ""),
     ],
     "species": [
         sp("Hymenophyllum wilsonii",        ". . . . . . . . . . .",

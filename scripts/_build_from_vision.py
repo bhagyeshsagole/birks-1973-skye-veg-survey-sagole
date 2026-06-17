@@ -41,7 +41,20 @@ try:  # noqa: SIM105
 except ImportError:
     TABLES_66_70 = []
 
-ALL_TABLES = TABLES + TABLES_25_40 + TABLES_39_50 + TABLES_51_60 + TABLES_61_65 + TABLES_66_70
+try:  # noqa: SIM105
+    from tables_data_71_96 import TABLES_71_96  # noqa: E402
+except ImportError:
+    TABLES_71_96 = []
+
+ALL_TABLES = (
+    TABLES
+    + TABLES_25_40
+    + TABLES_39_50
+    + TABLES_51_60
+    + TABLES_61_65
+    + TABLES_66_70
+    + TABLES_71_96
+)
 
 
 def cell_to_raw(cell: str) -> tuple[str, str]:
@@ -120,6 +133,42 @@ def main() -> None:
 
     all_rows = gold_rows + rows
 
+    # Propagate coordinates: for rows whose map_reference is empty, fill in
+    # lat/lon/easting/northing from another row with the same ref_code that does
+    # have coordinates.  This covers Tables 4.53/4.54 (epiphyte tables that share
+    # plots with other tables but didn't repeat map references).
+    # Normalise ref_code to "B68-317" style (replace space with dash) for matching.
+    coord_fields = ("map_reference", "os_grid_reference", "easting", "northing",
+                    "latitude", "longitude", "altitude_ft", "altitude_m",
+                    "aspect_deg", "slope_deg", "cover_pct", "plot_area_m2",
+                    "species_reported")
+    # Tables whose map_reference values are known to be synthetic (auto-generated from
+    # the ref_code number rather than read from the scan) and must not be used as
+    # coordinate sources.
+    synthetic_coord_tables = {"table_4_40", "table_4_49"}
+
+    ref_lookup: dict[str, dict[str, str]] = {}
+    for r in all_rows:
+        if r.get("table_id", "") in synthetic_coord_tables:
+            continue
+        rc = r.get("ref_code", "").strip().replace(" ", "-")
+        if rc and r.get("latitude", "").strip():
+            if rc not in ref_lookup:
+                ref_lookup[rc] = {f: r.get(f, "") for f in coord_fields}
+
+    filled = 0
+    for r in all_rows:
+        if r.get("latitude", "").strip():
+            continue
+        rc = r.get("ref_code", "").strip().replace(" ", "-")
+        if rc and rc in ref_lookup:
+            for f in coord_fields:
+                if not r.get(f, "").strip():
+                    r[f] = ref_lookup[rc][f]
+            filled += 1
+    if filled:
+        print(f"Propagated coordinates to {filled} rows via ref_code lookup")
+
     # Keep output.csv ordered by source image number (..._5.png before ..._6.png).
     # A stable sort preserves each image's internal table/species order.
     def image_number(row: dict[str, str]) -> int:
@@ -143,6 +192,7 @@ def main() -> None:
     images = P.find_images(Path("images"))
     # Image 8 (table 4.8) is the rotated 26-releve page; transcribed but kept flagged.
     flagged = {8}
+    review_images: dict[int, str] = {}
     image_notes = {
         13: "Transcribed from scan; table 4.13 releve 5 printed total is one higher than visible entries.",
         15: "Transcribed from scan; chemistry-only Table 4.16 not included in species output.",
@@ -151,6 +201,9 @@ def main() -> None:
         20: "Transcribed from scan; table 4.20 visible entries put releve 3 one below and releve 4 one above printed totals.",
         22: "Transcribed from scan; table 4.22 visible entries put releve 5 one above the printed total.",
         24: "Transcribed from scan; table 4.24 has unresolved count mismatches in releves 1, 3, and 5.",
+        71: "Transcribed from scan; table 4.53 visible entries put releve 6 one above the printed total.",
+        73: "Transcribed from scan; table 4.55 visible entries put releve 5 one below the printed total.",
+        74: "Transcribed from scan; table 4.56 visible entries put releve 2 two above the printed total.",
     }
     tracking_rows = []
     for idx, img in enumerate(images, start=1):
@@ -164,16 +217,18 @@ def main() -> None:
             status, note = "successful", image_notes.get(idx, "Transcribed from scan.")
         elif idx in NON_OBSERVATION_IMAGES:
             status, note = "successful", NON_OBSERVATION_IMAGES[idx]
+        elif idx in review_images:
+            status, note = "review", review_images[idx]
         else:
             status, note = "pending", ""
         tracking_rows.append({
             "image_file": image_file,
             "image_number": str(idx),
             "status": status,
-            "last_attempt_at": P.utc_timestamp() if n_obs or idx in NON_OBSERVATION_IMAGES else "",
+            "last_attempt_at": P.utc_timestamp() if n_obs or idx in NON_OBSERVATION_IMAGES or idx in review_images else "",
             "error_type": "",
             "error_message": "",
-            "observations_added": str(n_obs) if n_obs or idx in NON_OBSERVATION_IMAGES else "",
+            "observations_added": str(n_obs) if n_obs or idx in NON_OBSERVATION_IMAGES or idx in review_images else "",
             "plots_detected": "",
             "tables_detected": "",
             "note": note,
