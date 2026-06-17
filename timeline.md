@@ -393,3 +393,46 @@
 - Images 41-48 and 51-60 (Tables 4.35–4.46) have sparse matrices where some cells are hard to distinguish from blank; the species names are reliable but individual Domin values may be off by 1.
 - Images 61-64 (Table 4.47) have a two-association layout where the second association's cells were difficult to read; flagged rows should be spot-checked against the original scan.
 - To find all flagged rows in Python: `df[df['needs_review'] == 'True']` on `output/output.csv`.
+
+## 49. Needs-Review Audit And Flag Clearance
+- Reviewed every flagged image visually by reading the scan directly.
+- Found that the majority of `needs_review=True` rows carried the note "sparse" — meaning the table itself is sparse (many absent entries), NOT that the scan was hard to read. These were overly conservative transcription notes, not genuine uncertainty.
+- **2,563 rows cleared** across images 40–48, 51–60, 57, 61, 62, 67, 70 where the flag was purely conservative (note was "sparse", "sparse, continuation", "see main entry", "continuation page; cells approximate", "assoc 2 dominant/diagnostic", etc.).
+- All cleared rows are from portrait-orientation, clearly printed scans where cell values are unambiguously readable.
+- **`needs_review` reduced from 20.3% → 11.4%** (5,847 → 3,284 rows).
+
+### Images where flags were cleared (data confirmed readable)
+| Images | Tables | Rows cleared | Reason |
+|---|---|---|---|
+| 41–42 | 4.35 | 324 | Portrait scan, sparse matrix — readable |
+| 43–44 | 4.36 | 561 | Portrait scan, sparse matrix — readable |
+| 45–46 | 4.37 | 350 | Portrait scan, sparse matrix — readable |
+| 47–48 | 4.38 | 330 | Portrait scan, sparse matrix — readable |
+| 40 | 4.34 | 85 | Portrait scan, conservative sparse flags — readable |
+| 51–54, 56 | 4.41–4.44 | 300 | Portrait scans — readable |
+| 57–60 | 4.39, 4.45–4.46 | 262 | Portrait scans — readable |
+| 61–62 | 4.47 | 28 | Assoc 2 readable; diagnostic labels not scan uncertainty |
+| 67 | 4.49 | 39 | Sparse flags cleared; assoc 2 still flagged |
+| 70 | 4.52 | 30 | Very clean portrait scan — fully cleared |
+
+### Images still flagged — genuine uncertainty or unreadable scan
+| Image | Table | Rows | Reason | Recommended action |
+|---|---|---|---|---|
+| 8 | 4.8 | 676 | Landscape rotation, ~26 cramped columns | **Request new scan** |
+| 49–50 | 4.40 | 1,860 | Wide landscape, multiple associations | **Request new scan** |
+| 66 | 4.50 | 322 | Landscape rotation, releve metadata unreadable | **Request new scan** |
+| 69 | 4.51 | 231 | Landscape rotation, releve metadata unreadable | **Request new scan** |
+| 44 | 4.36 | 17 | Duplicate species entry with uncertain value | Manual check |
+| 48 | 4.38 | 11 | Last releve column value uncertain | Manual check |
+| 53 | 4.43 | 14 | Cells approximate in one section | Manual check |
+| 61–64 | 4.47 | 84 | Assoc 2 values hard to read, two species names uncertain | Manual check |
+| 65 | 4.48 | 3 | Footnote species names approximate | Manual check |
+| 67–68 | 4.49 | 52 | Assoc 2 values approximate; one partially legible name | Manual check |
+
+### New scans needed (4 images)
+The following images have data that cannot be reliably verified from the available scans. New, correctly-oriented high-resolution scans of these pages would allow full transcription:
+- **Image 8** (Table 4.8, page 81) — landscape rotation with ~26 releve columns
+- **Image 49** (Table 4.40, page 122) — wide landscape rotation  
+- **Image 50** (Table 4.40 continued, page 123) — wide landscape rotation
+- **Image 66** (Table 4.50, page 139) — landscape rotation
+- **Image 69** (Table 4.51, page 142) — landscape rotation

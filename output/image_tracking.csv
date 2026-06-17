@@ -6,7 +6,7 @@ images/Birks-HJB-1973-Present-Flora-Veg-Skye_4.png,4,successful,2026-06-17T09:55
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_5.png,5,successful,2026-06-17T09:55:29+00:00,,,232,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_6.png,6,successful,2026-06-17T09:55:29+00:00,,,52,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_7.png,7,successful,2026-06-17T09:55:29+00:00,,,156,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_8.png,8,successful,2026-06-17T09:55:29+00:00,,,676,,,"Transcribed from scan; rotated multi-column page, some cells flagged for review."
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_8.png,8,successful,2026-06-17T09:55:29+00:00,,,676,,,Rotated landscape scan (~26 releve columns); abundance cells unreadable — needs new scan for reliable data.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_9.png,9,successful,2026-06-17T09:55:29+00:00,,,207,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_10.png,10,successful,2026-06-17T09:55:29+00:00,,,143,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_11.png,11,successful,2026-06-17T09:55:29+00:00,,,78,,,Transcribed from scan.
@@ -38,20 +38,20 @@ images/Birks-HJB-1973-Present-Flora-Veg-Skye_36.png,36,successful,2026-06-17T09:
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_37.png,37,successful,2026-06-17T09:55:29+00:00,,,320,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_38.png,38,successful,2026-06-17T09:55:29+00:00,,,740,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_39.png,39,successful,2026-06-17T09:55:29+00:00,,,708,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_40.png,40,successful,2026-06-17T09:55:29+00:00,,,295,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_40.png,40,successful,2026-06-17T09:55:29+00:00,,,295,,,Transcribed from scan; 85 rows remain flagged needs_review (specific presence uncertainty in sparse cells).
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_41.png,41,successful,2026-06-17T09:55:29+00:00,,,360,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_42.png,42,successful,2026-06-17T09:55:29+00:00,,,468,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_42.png,42,successful,2026-06-17T09:55:29+00:00,,,468,,,"Transcribed from scan; Table 4.35 continuation page — readable, flags cleared."
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_43.png,43,successful,2026-06-17T09:55:29+00:00,,,425,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_44.png,44,successful,2026-06-17T09:55:29+00:00,,,459,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_44.png,44,successful,2026-06-17T09:55:29+00:00,,,459,,,Transcribed from scan; 17 rows flagged for duplicate species entries with uncertain values.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_45.png,45,successful,2026-06-17T09:55:29+00:00,,,392,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_46.png,46,successful,2026-06-17T09:55:29+00:00,,,280,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_47.png,47,successful,2026-06-17T09:55:29+00:00,,,341,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_48.png,48,successful,2026-06-17T09:55:29+00:00,,,330,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_49.png,49,successful,2026-06-17T09:55:29+00:00,,,930,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_50.png,50,successful,2026-06-17T09:55:29+00:00,,,930,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_47.png,47,successful,2026-06-17T09:55:29+00:00,,,341,,,"Transcribed from scan; Table 4.38 continuation — readable, flags cleared."
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_48.png,48,successful,2026-06-17T09:55:29+00:00,,,330,,,Transcribed from scan; 11 rows flagged: last releve column value uncertain from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_49.png,49,successful,2026-06-17T09:55:29+00:00,,,930,,,Table 4.40 wide rotated landscape scan; all cell values at best effort — needs new scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_50.png,50,successful,2026-06-17T09:55:29+00:00,,,930,,,Table 4.40 continued (rotated landscape); all cell values at best effort — needs new scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_51.png,51,successful,2026-06-17T09:55:29+00:00,,,495,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_52.png,52,successful,2026-06-17T09:55:29+00:00,,,344,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_53.png,53,successful,2026-06-17T09:55:29+00:00,,,476,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_53.png,53,successful,2026-06-17T09:55:29+00:00,,,476,,,Transcribed from scan; 14 rows flagged: cells approximate in Table 4.43.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_54.png,54,successful,2026-06-17T09:55:29+00:00,,,560,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_55.png,55,successful,2026-06-17T09:55:29+00:00,,,174,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_56.png,56,successful,2026-06-17T09:55:29+00:00,,,282,,,Transcribed from scan.
@@ -59,16 +59,16 @@ images/Birks-HJB-1973-Present-Flora-Veg-Skye_57.png,57,successful,2026-06-17T09:
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_58.png,58,successful,2026-06-17T09:55:29+00:00,,,300,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_59.png,59,successful,2026-06-17T09:55:29+00:00,,,203,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_60.png,60,successful,2026-06-17T09:55:29+00:00,,,420,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_61.png,61,successful,2026-06-17T09:55:29+00:00,,,420,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_62.png,62,successful,2026-06-17T09:55:29+00:00,,,602,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_63.png,63,successful,2026-06-17T09:55:29+00:00,,,434,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_64.png,64,successful,2026-06-17T09:55:29+00:00,,,546,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_65.png,65,successful,2026-06-17T09:55:29+00:00,,,80,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_66.png,66,successful,2026-06-17T09:55:29+00:00,,,322,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_67.png,67,successful,2026-06-17T09:55:29+00:00,,,468,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_68.png,68,successful,2026-06-17T09:55:29+00:00,,,663,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_69.png,69,successful,2026-06-17T09:55:29+00:00,,,231,,,Transcribed from scan.
-images/Birks-HJB-1973-Present-Flora-Veg-Skye_70.png,70,successful,2026-06-17T09:55:29+00:00,,,186,,,Transcribed from scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_61.png,61,successful,2026-06-17T09:55:29+00:00,,,420,,,"Transcribed from scan; Table 4.47 — readable, most flags cleared; 14 assoc 2 rows still approximate."
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_62.png,62,successful,2026-06-17T09:55:29+00:00,,,602,,,Transcribed from scan; Table 4.47 cont — some assoc 2 cells illegible image 62; 42 rows remain flagged.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_63.png,63,successful,2026-06-17T09:55:29+00:00,,,434,,,Transcribed from scan; Table 4.47 cont — 42 rows flagged: one uncertain species name and assoc 2 values hard to read.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_64.png,64,successful,2026-06-17T09:55:29+00:00,,,546,,,Transcribed from scan; Table 4.47 cont — 28 rows flagged: one partially legible species name.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_65.png,65,successful,2026-06-17T09:55:29+00:00,,,80,,,Transcribed from scan; 3 rows flagged: additional footnote species names approximate.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_66.png,66,successful,2026-06-17T09:55:29+00:00,,,322,,,Rotated landscape scan (Table 4.50); cell values and releve metadata unreadable — needs new scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_67.png,67,successful,2026-06-17T09:55:29+00:00,,,468,,,Transcribed from scan; sparse flags cleared; 39 rows remain flagged for assoc 2 approximate values and C/D.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_68.png,68,successful,2026-06-17T09:55:29+00:00,,,663,,,Transcribed from scan; 13 rows flagged: one species name partially legible in image 68.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_69.png,69,successful,2026-06-17T09:55:29+00:00,,,231,,,Rotated landscape scan (Table 4.51); cell values and releve metadata unreadable — needs new scan.
+images/Birks-HJB-1973-Present-Flora-Veg-Skye_70.png,70,successful,2026-06-17T09:55:29+00:00,,,186,,,"Transcribed from scan; Table 4.52 — readable, most flags cleared; 0 rows remain flagged."
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_71.png,71,successful,2026-06-17T09:55:29+00:00,,,806,,,Transcribed from scan; table 4.53 visible entries put releve 6 one above the printed total.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_72.png,72,successful,2026-06-17T09:55:29+00:00,,,264,,,Transcribed from scan.
 images/Birks-HJB-1973-Present-Flora-Veg-Skye_73.png,73,successful,2026-06-17T09:55:29+00:00,,,475,,,Transcribed from scan; table 4.55 visible entries put releve 5 one below the printed total.
