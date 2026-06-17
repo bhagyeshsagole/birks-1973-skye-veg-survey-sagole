@@ -31,9 +31,21 @@ import pandas as pd
 from PIL import Image
 
 
-# These defaults let the script run without typing long paths every time.
-# The model is the smaller local vision model that works on the 8GB MacBook Air.
+# Fallback model used when no better model is detected from ollama list.
+# qwen2.5vl:3b works on low-RAM machines but under-extracts dense tables.
 DEFAULT_MODEL = "qwen2.5vl:3b"
+
+# Ordered preference list: strongest document-OCR vision model first.
+# The script auto-detects the best installed model at startup.
+# Pull your preferred model once with: ollama pull qwen2.5vl:72b
+PREFERRED_MODELS = [
+    "qwen2.5vl:72b",
+    "llama3.2-vision:90b",
+    "qwen2.5vl:32b",
+    "qwen2.5vl:7b",
+    "qwen2.5vl:3b",
+]
+
 DEFAULT_IMAGES_DIR = Path("images")
 DEFAULT_OUTPUT_PATH = Path("output/output.csv")
 DEFAULT_TRACKING_OUTPUT_PATH = Path("output/image_tracking.csv")
@@ -189,6 +201,40 @@ Rules:
 """
 
 
+def detect_best_available_model() -> str:
+    """Return the strongest Qwen2.5-VL model currently installed in Ollama.
+
+    Checks `ollama list` and walks PREFERRED_MODELS in order. Falls back to
+    DEFAULT_MODEL when Ollama is not running or no preferred model is found.
+    """
+    try:
+        response = ollama.list()
+        # ollama Python SDK may return an object or a plain dict depending on version.
+        models_list = getattr(response, "models", None) or response.get("models", [])
+        installed: set[str] = set()
+        for m in models_list:
+            name = (
+                getattr(m, "model", None)
+                or (m.get("model") if isinstance(m, dict) else None)
+                or getattr(m, "name", None)
+                or (m.get("name") if isinstance(m, dict) else None)
+                or ""
+            )
+            if name:
+                installed.add(name)
+        for preferred in PREFERRED_MODELS:
+            if preferred in installed:
+                return preferred
+            # also match without tag (e.g. "qwen2.5vl" matches "qwen2.5vl:7b-q4_K_M")
+            base = preferred.split(":")[0].lower()
+            for name in sorted(installed):
+                if name.lower().startswith(base + ":"):
+                    return name
+    except Exception:
+        pass
+    return DEFAULT_MODEL
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Define all command-line options for the script.
 
@@ -202,7 +248,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--images-dir", type=Path, default=DEFAULT_IMAGES_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--tracking-output", type=Path, default=DEFAULT_TRACKING_OUTPUT_PATH)
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Ollama model to use. Omit to auto-detect the strongest available "
+            "Qwen2.5-VL model from ollama list. Pass an explicit name to override."
+        ),
+    )
     parser.add_argument(
         "--mode",
         choices=("tidy",),
@@ -238,24 +291,54 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-image-side",
         type=int,
-        default=1600,
-        help="Resize a temporary copy so the longest image side is at most this many pixels. Use 0 to send originals.",
+        default=0,
+        help=(
+            "Resize a temporary copy so the longest image side is at most this many pixels. "
+            "Default is 0 (send at full resolution). Use a positive number only when RAM is "
+            "constrained (e.g. --max-image-side 1600 for an 8GB machine)."
+        ),
     )
     parser.add_argument(
         "--num-predict",
         type=int,
-        default=8192,
+        default=16384,
         help="Maximum response tokens Ollama can generate per image. Use 0 for the model default.",
     )
     parser.add_argument(
         "--num-ctx",
         type=int,
-        default=16384,
+        default=32768,
         help=(
-            "Context window size in tokens. This must be large enough to hold the "
-            "prompt, the image tokens, AND the full JSON response. Ollama defaults to "
-            "only 4096, which silently truncates big tables (e.g. tables 4.6-4.8) and "
-            "makes them look like failed reads. Use 0 for the model default."
+            "Context window size in tokens. Must be large enough to hold the prompt, "
+            "image tokens, AND the full JSON response. Ollama defaults to only 4096, "
+            "which silently truncates big tables and makes them look like failed reads. "
+            "Use 0 for the model default."
+        ),
+    )
+    parser.add_argument(
+        "--no-auto-rotate",
+        action="store_true",
+        default=False,
+        help="Disable automatic rotation correction for landscape-orientation scan pages.",
+    )
+    parser.add_argument(
+        "--tile",
+        action="store_true",
+        default=False,
+        help=(
+            "Split wide tables into header + left/right matrix tiles and upscale each "
+            "tile ~2.5× before sending to the model. Improves accuracy on tables with "
+            ">10 releve columns. Requires more RAM and more Ollama calls per image."
+        ),
+    )
+    parser.add_argument(
+        "--verify-counts",
+        action="store_true",
+        default=False,
+        help=(
+            "After extraction, cross-check per-releve species counts against the printed "
+            "Total-number-of-species row. Logs a warning and sets needs_review when counts "
+            "diverge by more than 2."
         ),
     )
     return parser
@@ -291,22 +374,44 @@ def read_prompt(prompt_file: Path) -> str:
     return prompt_file.read_text(encoding="utf-8").strip()
 
 
-def prepare_image_for_ollama(image_path: Path, max_image_side: int) -> tuple[Path, Path | None]:
-    """Create a smaller temporary image for Ollama when the scan is large.
+def prepare_image_for_ollama(
+    image_path: Path,
+    max_image_side: int,
+    auto_rotate: bool = True,
+) -> tuple[Path, Path | None]:
+    """Create a pre-processed temporary image for Ollama.
 
-    The original file is never changed. If the image is already small enough,
-    the original path is returned. If it is too large, the function saves a
-    temporary JPEG and returns that path plus the same path as a cleanup target.
+    Changes applied in order: (1) rotate landscape pages to portrait when
+    auto_rotate is True, (2) resize if max_image_side > 0 and the image
+    exceeds that limit. The original file is never modified.
+
+    Returns (send_path, cleanup_path). cleanup_path is None when the original
+    file is returned unchanged so the caller knows not to delete it.
     """
     with Image.open(image_path) as image:
         image.load()
 
-        # A max side of 0 means "do not resize".
-        if max_image_side <= 0 or max(image.size) <= max_image_side:
+        w, h = image.size
+        modified = False
+
+        # Rotate landscape pages to portrait. A page that is significantly wider
+        # than it is tall is almost certainly a rotated scan (e.g. Table 4.8 or
+        # Tables 4.50/4.51). Rotating 90° counter-clockwise puts the column
+        # headers at the top where the model expects them.
+        if auto_rotate and w > h * 1.35:
+            image = image.rotate(90, expand=True)
+            w, h = image.size
+            modified = True
+
+        # A max side of 0 means "do not resize — send full resolution".
+        needs_resize = max_image_side > 0 and max(image.size) > max_image_side
+        if needs_resize:
+            image.thumbnail((max_image_side, max_image_side), Image.Resampling.LANCZOS)
+            modified = True
+
+        if not modified:
             return image_path, None
 
-        # thumbnail keeps the aspect ratio, so the page is not stretched.
-        image.thumbnail((max_image_side, max_image_side), Image.Resampling.LANCZOS)
         if image.mode not in {"RGB", "L"}:
             image = image.convert("RGB")
 
@@ -584,6 +689,107 @@ def parse_table_csv(text: str) -> list[dict[str, str]]:
     return parsed_rows
 
 
+def prepare_image_tiles(
+    image_path: Path,
+    max_image_side: int,
+    auto_rotate: bool = True,
+) -> list[tuple[Path, Path | None]]:
+    """Split a wide-column table into upscaled header + matrix tiles.
+
+    Tiling is only applied when the page (after rotation) is still wide
+    relative to its height — i.e. a page with many releve columns that a
+    single downscaled view would make too small to read accurately. Each tile
+    is upscaled ~2.5× so fine print is large enough for the vision model.
+
+    Returns a list of (send_path, cleanup_path) pairs in order:
+      [0] header tile — top 18 % of page (releve IDs, map refs, metadata rows)
+      [1] matrix-left tile — left half of species × releve matrix
+      [2] matrix-right tile — right half of species × releve matrix
+
+    Falls back to a single-image list when the page is portrait-orientation
+    (no tiling needed).
+    """
+    with Image.open(image_path) as image:
+        image.load()
+        w, h = image.size
+
+        # Rotate landscape scans first.
+        if auto_rotate and w > h * 1.35:
+            image = image.rotate(90, expand=True)
+            w, h = image.size
+
+        # Only tile tall-but-wide pages (after rotation a wide table still has
+        # many columns — roughly >1.15:1 width-to-height after rotation).
+        if w <= h * 1.15:
+            # Portrait or near-square — a single image is fine.
+            return [prepare_image_for_ollama(image_path, max_image_side, auto_rotate)]
+
+        tiles: list[tuple[Path, Path | None]] = []
+        UPSCALE = 2.5
+        QUALITY = 95
+        OVERLAP = 0.10  # column overlap between left and right matrix tiles
+
+        regions = [
+            ("hdr", (0, 0, w, int(h * 0.18))),
+            ("mtxL", (0, int(h * 0.18), int(w * (0.5 + OVERLAP)), h)),
+            ("mtxR", (int(w * (0.5 - OVERLAP)), int(h * 0.18), w, h)),
+        ]
+
+        for label, box in regions:
+            tile = image.crop(box)
+            new_w = int(tile.width * UPSCALE)
+            new_h = int(tile.height * UPSCALE)
+            if max_image_side > 0:
+                scale = min(max_image_side / max(new_w, new_h), UPSCALE)
+                new_w = max(1, int(tile.width * scale))
+                new_h = max(1, int(tile.height * scale))
+            tile = tile.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            if tile.mode not in {"RGB", "L"}:
+                tile = tile.convert("RGB")
+            with tempfile.NamedTemporaryFile(
+                prefix=f"{image_path.stem}_{label}_",
+                suffix=".jpg",
+                delete=False,
+            ) as tf:
+                tile_path = Path(tf.name)
+            tile.save(tile_path, format="JPEG", quality=QUALITY)
+            tiles.append((tile_path, tile_path))
+
+    return tiles
+
+
+def verify_observation_counts(
+    plot_rows: list[dict[str, str]],
+    observation_rows: list[dict[str, str]],
+) -> list[str]:
+    """Cross-check per-releve observation counts against species_reported.
+
+    Returns a list of issue strings. An empty list means all counts reconcile
+    or no species_reported values were available to check against.
+    """
+    from collections import Counter
+
+    issues: list[str] = []
+    obs_per_releve: Counter[str] = Counter(
+        r["releve_id"] for r in observation_rows if r.get("releve_id")
+    )
+    for plot in plot_rows:
+        rid = plot.get("releve_id", "").strip()
+        reported = plot.get("species_reported", "").strip()
+        if not rid or not reported:
+            continue
+        try:
+            expected = int(reported)
+        except ValueError:
+            continue
+        actual = obs_per_releve.get(rid, 0)
+        if abs(actual - expected) > 2:
+            issues.append(
+                f"releve {rid}: species_reported={expected} but extracted {actual} observations"
+            )
+    return issues
+
+
 def call_ollama_image(
     image_path: Path,
     model: str,
@@ -592,6 +798,7 @@ def call_ollama_image(
     num_predict: int,
     response_format: str | None = None,
     num_ctx: int = 0,
+    auto_rotate: bool = True,
 ) -> str:
     """Send one image and one prompt to Ollama, then return the model text.
 
@@ -604,7 +811,7 @@ def call_ollama_image(
     added together. Big tables overflow it and come back empty or truncated, so
     the caller should pass a generous value.
     """
-    ollama_image_path, temporary_path = prepare_image_for_ollama(image_path, max_image_side)
+    ollama_image_path, temporary_path = prepare_image_for_ollama(image_path, max_image_side, auto_rotate)
     options = {"temperature": 0}
     if num_predict > 0:
         options["num_predict"] = num_predict
@@ -807,6 +1014,9 @@ def parse_tidy_image(
     previous_context: str = "",
     previous_plot_rows: list[dict[str, str]] | None = None,
     num_ctx: int = 0,
+    auto_rotate: bool = True,
+    tile: bool = False,
+    verify_counts: bool = False,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     """Parse one image into table rows, plot rows, and observation rows.
 
@@ -824,16 +1034,59 @@ def parse_tidy_image(
     page so observation rows stay self-contained.
     """
     full_prompt = f"{previous_context}\n{prompt}" if previous_context else prompt
-    raw_response = call_ollama_image(
-        image_path=image_path,
-        model=model,
-        prompt=full_prompt,
-        max_image_side=max_image_side,
-        num_predict=num_predict,
-        response_format="json",
-        num_ctx=num_ctx,
-    )
-    parsed = extract_json_object(raw_response)
+
+    if tile:
+        # Tiled mode: send header tile + left/right matrix tiles separately.
+        # Merge the JSON objects: use the first successful parse for metadata
+        # and accumulate observations from all tiles.
+        tiles = prepare_image_tiles(image_path, max_image_side, auto_rotate)
+        merged: dict[str, Any] = {}
+        for tile_path, cleanup_path in tiles:
+            try:
+                raw = call_ollama_image(
+                    image_path=tile_path,
+                    model=model,
+                    prompt=full_prompt,
+                    max_image_side=0,  # tiles are already sized
+                    num_predict=num_predict,
+                    response_format="json",
+                    num_ctx=num_ctx,
+                    auto_rotate=False,  # already rotated during tiling
+                )
+                obj = extract_json_object(raw)
+                if not merged:
+                    merged = obj
+                else:
+                    # Accumulate observations and plots across tiles.
+                    for key in ("observations", "plots"):
+                        existing = merged.get(key) or []
+                        incoming = obj.get(key) or []
+                        if isinstance(incoming, list):
+                            seen_ids = {
+                                (r.get("releve_id", ""), r.get("species", ""))
+                                for r in existing
+                            }
+                            for r in incoming:
+                                if (r.get("releve_id", ""), r.get("species", "")) not in seen_ids:
+                                    existing.append(r)
+                                    seen_ids.add((r.get("releve_id", ""), r.get("species", "")))
+                            merged[key] = existing
+            finally:
+                if cleanup_path is not None:
+                    cleanup_path.unlink(missing_ok=True)
+        parsed = merged
+    else:
+        raw_response = call_ollama_image(
+            image_path=image_path,
+            model=model,
+            prompt=full_prompt,
+            max_image_side=max_image_side,
+            num_predict=num_predict,
+            response_format="json",
+            num_ctx=num_ctx,
+            auto_rotate=auto_rotate,
+        )
+        parsed = extract_json_object(raw_response)
 
     metadata = parsed.get("table_metadata", {})
     if not isinstance(metadata, dict):
@@ -878,6 +1131,25 @@ def parse_tidy_image(
     # If no printed table id was found, use the image filename as a stable id.
     if not table_row["table_id"]:
         table_row["table_id"] = table_id
+
+    # Verification pass: cross-check per-releve species counts against the
+    # printed total row. On a mismatch, flag the affected observations so
+    # downstream users know to check them rather than trust the count silently.
+    if verify_counts and plot_rows and observation_rows:
+        count_issues = verify_observation_counts(
+            effective_plots if not plot_rows else plot_rows,
+            observation_rows,
+        )
+        if count_issues:
+            issue_str = "; ".join(count_issues)
+            print(f"  COUNT MISMATCH: {issue_str}", flush=True)
+            # Mark all observations from this image as needing review.
+            for obs in observation_rows:
+                if obs.get("needs_review", "").lower() != "true":
+                    obs["needs_review"] = "True"
+                    existing_note = obs.get("note", "")
+                    mismatch_note = f"Count mismatch: {issue_str}"
+                    obs["note"] = f"{existing_note}; {mismatch_note}".lstrip("; ")
 
     return [table_row], plot_rows, observation_rows
 
@@ -1149,6 +1421,9 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
                 previous_context=page_context,
                 previous_plot_rows=prev_plot_rows,
                 num_ctx=args.num_ctx,
+                auto_rotate=not args.no_auto_rotate,
+                tile=args.tile,
+                verify_counts=args.verify_counts,
             )
             observation_rows.extend(image_observations)
             successful += 1
@@ -1189,6 +1464,13 @@ def run_tidy_mode(args: argparse.Namespace, images: list[Path]) -> None:
 def main() -> None:
     """Read command-line arguments, find images, and dispatch to one mode."""
     args = build_parser().parse_args()
+
+    # Auto-detect the strongest available model unless the user specified one.
+    if args.model is None:
+        args.model = detect_best_available_model()
+        print(f"Auto-selected model: {args.model}", flush=True)
+    else:
+        print(f"Using model: {args.model}", flush=True)
     all_images = find_images(args.images_dir)
     args.all_images = all_images
     args.total_images_found = len(all_images)

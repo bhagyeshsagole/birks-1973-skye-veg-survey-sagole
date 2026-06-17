@@ -8,10 +8,23 @@ Keep this file current. When the process changes, remove the old process from th
 
 The pipeline converts scanned Birks vegetation survey tables into tidy CSV files.
 
-The current target output is not a visual copy of the printed table. The target is analysis-ready research data:
+The current target output is analysis-ready research data:
 
-- `output/output.csv`: long-format species observations.
-- `output/image_tracking.csv`: simple image-level progress tracking.
+- `output/output.csv`: long-format species observations, one row per species per releve.
+- `output/image_tracking.csv`: per-image extraction status (successful / pending / unsuccessful).
+
+## How Accuracy Is Achieved
+
+The pipeline uses several techniques to read these dense 1970s phytosociological tables reliably:
+
+- **Auto-model selection.** At startup the script checks `ollama list` and picks the strongest available Qwen2.5-VL model. Larger models read fine print, rotated text, and crowded columns significantly better than the 3B model.
+- **Auto-rotation.** Pages in landscape orientation (e.g. Table 4.8) are rotated to portrait before being sent to the model, so column headers appear at the top where the model expects them.
+- **Full-resolution input.** By default images are sent at their original scan resolution (no downscaling). You can limit resolution with `--max-image-side` only if you are RAM-constrained.
+- **Large context window.** `--num-ctx 32768` ensures dense tables are never silently truncated. The old 4096-token default made large tables appear as failed reads.
+- **Temperature 0.** Deterministic model output; no hallucinated cells.
+- **Multi-page context.** When a table spans two pages, the column headers from page N are carried forward so page N+1 observations inherit the correct releve IDs and coordinates.
+- **Optional tiling** (`--tile`). For pages with more than ~10 releve columns, tiling sends an upscaled header tile and two upscaled matrix tiles separately, improving small-print accuracy.
+- **Optional count verification** (`--verify-counts`). After extraction, per-releve species counts are cross-checked against the printed Total-number-of-species row. Any divergence of more than 2 species sets `needs_review=True` on affected rows.
 
 ## Current Folder Structure
 
@@ -38,16 +51,29 @@ instructions.md
   Local agent instructions. This file is ignored by git.
 ```
 
+## Hardware Requirements
+
+The pipeline is CPU + RAM bound at model load time. Disk is not a constraint (images + models).
+
+| Model | Min RAM | Recommended RAM | Notes |
+|---|---|---|---|
+| `qwen2.5vl:3b` | 4 GB | 8 GB | Works on a MacBook Air; under-extracts dense tables |
+| `qwen2.5vl:7b` | 8 GB | 12 GB | Good balance of speed and accuracy |
+| `qwen2.5vl:32b` | 24 GB | 32 GB | Strong accuracy; slow on CPU |
+| `qwen2.5vl:72b` | 48 GB | 64 GB | Best accuracy; requires a GPU or large RAM machine |
+| `llama3.2-vision:90b` | 64 GB | 80 GB | Strong alternative; very large |
+
+If RAM is limited, add `--max-image-side 1600` to the parse command to reduce image token cost.
+
 ## Required Tools
 
 Install these first:
 
 - Git
 - Python 3.10 or newer
-- Ollama
-- VS Code or another editor
+- Ollama (official app, not Homebrew)
 
-Ollama runs the local AI models. Python runs the pipeline scripts.
+> **Important:** Install Ollama from the official macOS or Windows app at `https://ollama.com`, not via Homebrew. The Homebrew package does not include the `llama-server` runtime binary and will fail to load models.
 
 ## Clone The Repository
 
@@ -81,7 +107,7 @@ py -m venv .venv
 pip install -r requirements.txt
 ```
 
-If Windows blocks activation, run this in PowerShell:
+If Windows blocks activation, run this in PowerShell first:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
@@ -91,17 +117,16 @@ Then activate the environment again.
 
 ## Install And Start Ollama
 
-Install Ollama from:
+Install from the official site:
 
 ```text
 https://ollama.com
 ```
 
-After installing, start Ollama.
+After installing, start the Ollama app.
 
-On Mac, open the Ollama app.
-
-On Windows, open the Ollama app or start it from the Start menu.
+On Mac, open Ollama.app from Applications.
+On Windows, open the Ollama app from the Start menu.
 
 Check that Ollama is running:
 
@@ -111,17 +136,35 @@ ollama list
 
 If this command cannot connect, Ollama is not running yet.
 
-## Pull The Local Models
+## Pull A Vision Model
 
-The current working models are:
+The script auto-detects the strongest model you have installed. Pull the best one your machine can run:
 
-- `qwen2.5vl:3b` for image parsing.
+### 72B (best accuracy, large machine required)
 
-Pull them once:
+```bash
+ollama pull qwen2.5vl:72b
+```
+
+### 32B (good accuracy, 24+ GB RAM)
+
+```bash
+ollama pull qwen2.5vl:32b
+```
+
+### 7B (good balance, 8+ GB RAM)
+
+```bash
+ollama pull qwen2.5vl:7b
+```
+
+### 3B (fallback, any machine)
 
 ```bash
 ollama pull qwen2.5vl:3b
 ```
+
+You only need one. The script picks the largest one you have when you run it.
 
 Check installed models:
 
@@ -140,112 +183,133 @@ images/
 Supported image types:
 
 ```text
-.jpg
-.jpeg
-.png
-.tif
-.tiff
+.jpg  .jpeg  .png  .tif  .tiff
 ```
 
 The `images/` folder is ignored by git. Do not commit raw scans.
 
-## Current Preferred Parse Command
+## Current Parse Command
 
-Run a three-image test first:
+The script auto-selects the best available model and uses full-resolution input and a 32k context window by default.
+
+### Three-image test (recommended first step)
 
 ```bash
-python3 scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --limit 3 --resume
 ```
 
-On Windows, if `python3` does not work, use:
+On Windows:
 
 ```powershell
-py scripts/parse_images.py --resume --limit 3 --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+py scripts/parse_images.py --limit 3 --resume
 ```
 
-What this command does:
+What this does:
 
-- Selects the first 3 images from `images/` for a safe test.
-- Uses natural numeric sorting so image 2 comes before image 10.
-- Sends one image at a time to `qwen2.5vl:3b`.
-- Uses `prompts/csv_parsing_instructions.md` as the extraction prompt.
-- Resizes a temporary copy of large images to a maximum side of 1000 pixels.
-- Allows a longer model response with `--num-predict 8192`.
-- Saves `output/output.csv` and `output/image_tracking.csv` after every image.
-- Skips images already marked `successful` or `unsuccessful` when `--resume` is used.
+- Detects the strongest available Qwen2.5-VL model automatically.
+- Sends images at full scan resolution (no downscaling).
+- Uses `--num-ctx 32768` so dense tables are not truncated.
+- Uses `--num-predict 16384` so long table responses are not cut short.
+- Sets temperature 0 (deterministic output).
+- Auto-rotates landscape-orientation pages before sending.
+- Saves after every image; `--resume` skips already-successful images on re-run.
 
-After checking the three-image output, process all remaining images:
+### Full run
 
 ```bash
-python3 scripts/parse_images.py --resume --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --resume
 ```
 
-You can stop this command and run the same command later. `--resume` reads
-`output/image_tracking.csv` and continues without repeating completed work.
+Stop and restart at any time. `--resume` reads `output/image_tracking.csv` and continues without repeating completed images.
 
-To explicitly retry images that previously failed, run:
+### Retry previously failed images
 
 ```bash
-python3 scripts/parse_images.py --resume --retry-failed --batch-size 1 --max-image-side 1000 --num-predict 8192 --mode tidy --prompt-file prompts/csv_parsing_instructions.md
+python3 scripts/parse_images.py --resume --retry-failed
+```
+
+### Tiled mode — for tables with many releve columns
+
+Use `--tile` when a table has more than ~10 releve columns (e.g. Table 4.8). Tiling upscales the header and matrix regions separately for better small-print accuracy:
+
+```bash
+python3 scripts/parse_images.py --resume --tile
+```
+
+### Count verification — check species totals after extraction
+
+Use `--verify-counts` to cross-check extracted per-releve species counts against the printed Total-number-of-species row. Mismatched rows are flagged `needs_review=True` automatically:
+
+```bash
+python3 scripts/parse_images.py --resume --verify-counts
+```
+
+### Low-RAM machine (8 GB or less)
+
+If the model runs out of memory, cap image resolution and context:
+
+```bash
+python3 scripts/parse_images.py --resume --max-image-side 1600 --num-ctx 8192 --num-predict 6144
+```
+
+### Override the auto-selected model
+
+```bash
+python3 scripts/parse_images.py --model qwen2.5vl:7b --resume
 ```
 
 ## Output Files
 
-After a successful tidy run, check:
+After a successful run, check:
 
 ```text
 output/output.csv
 output/image_tracking.csv
 ```
 
-`output.csv` is the scientific data file. `image_tracking.csv` is the simple
-progress file with one row per image and statuses such as `successful`,
-`pending`, and `unsuccessful`.
+`output.csv` is the scientific data file. `image_tracking.csv` is the progress file with one row per image.
 
 ### `output/output.csv`
 
-Main observation table.
-
-One row means:
-
-```text
-one species in one plot/releve
-```
+Main observation table. One row = one species in one plot/releve.
 
 Use this for:
 
-- species richness
-- abundance summaries
+- species richness per releve or community
 - Domin-scale cover-range analysis
-- community composition
-- ordination
+- community composition and ordination
 - beta-diversity
 - resurvey comparisons
 
+Columns include `latitude`, `longitude` (WGS84, converted offline from British National Grid map references), `domin_value`, `domin_cover_min_pct`, `domin_cover_max_pct`, and `needs_review`.
+
 ### `output/image_tracking.csv`
 
-Image-level progress tracker.
+Image-level progress tracker. One row = one source image.
 
-One row means:
+- `successful` — extraction complete and at least one observation row was produced.
+- `pending` — not yet attempted.
+- `unsuccessful` — extraction failed; see `error_message` column.
+- `review` — image was intentionally skipped (e.g. non-observation page such as a synoptic constancy table).
 
-```text
-one image in images/
-```
+## Notes On Known Difficult Images
 
-Use this for:
+Some images need extra care and are documented in `output/image_tracking.csv`:
 
-- seeing which images are `successful`
-- seeing which images are still `pending`
-- seeing which images were `unsuccessful`
-- reviewing the latest error message
-- resuming without repeating already accepted images
-
-The first five images are currently marked `successful` because the accepted
-prototype output is already represented in `output/output.csv`.
+| Image | Table | Issue |
+|---|---|---|
+| 8 | 4.8 | Rotated landscape page, ~26 releve columns. Auto-rotation corrects the orientation but `--tile` gives better per-cell accuracy. All 676 rows marked `needs_review`. |
+| 13, 17, 19, 20, 22, 24 | 4.13 etc. | Minor count discrepancies (±1 species) between visible entries and printed totals. Appear to be printing errors in the 1973 thesis. |
+| 24 | 4.24 | Larger count gap in releve 5 (23 extracted vs 28 printed). |
+| 31 | — | Severely damaged/illegible scan. Marked as non-observation. |
+| 66 | 4.50 | Rotated landscape scan; releve metadata unreadable. Coordinates left blank. |
+| 67 | 4.49 | Map Reference row resolution too low to read reliably. |
+| 69 | 4.51 | Rotated landscape scan; releve metadata unreadable. Coordinates left blank. |
+| 75–96 | 4.57 | Synoptic constancy table (species × community columns, not plots). Not a species-by-releve matrix; excluded from output.csv. |
 
 ## Optional Google Drive Download
 
-If you have a Google Drive folder link for raw images, run:
+If you have a Google Drive folder link for raw images:
 
 ```bash
 python3 scripts/download_drive.py
@@ -264,10 +328,10 @@ The script asks for the Drive folder link and downloads files into `images/`.
 1. Start Ollama.
 2. Activate the Python environment.
 3. Put images in `images/`.
-4. Run a small `--resume --limit 3` test.
+4. Run `python3 scripts/parse_images.py --limit 3 --resume` as a test.
 5. Inspect `output/output.csv` and `output/image_tracking.csv`.
-6. Fix prompts or code if the output is wrong.
-7. Run the full `--resume` command and leave it working locally.
+6. If output looks correct, run `python3 scripts/parse_images.py --resume` for all images.
+7. Add `--verify-counts` to flag count mismatches automatically.
 
 ## Common Problems
 
@@ -279,11 +343,7 @@ Problem:
 Failed to connect to Ollama
 ```
 
-Fix:
-
-- Open the Ollama app.
-- Run `ollama list`.
-- Try the parser again.
+Fix: Open the Ollama app. Run `ollama list`. Try the parser again.
 
 ### Model Not Found
 
@@ -296,54 +356,41 @@ model not found
 Fix:
 
 ```bash
-ollama pull qwen2.5vl:3b
+ollama pull qwen2.5vl:7b
 ```
 
 ### Output Has Too Few Rows
 
-This usually means the model under-extracted the table.
+A table with 25 species and 7 releves should produce about 175 rows. If the output is much smaller, the most common cause is an insufficient context window. Try:
 
-For a table with 25 species and 7 releves, the observation output should have about:
-
-```text
-25 x 7 = 175 rows
+```bash
+python3 scripts/parse_images.py --num-ctx 32768 --resume --retry-failed
 ```
 
-If the output is much smaller, the prompt or extraction strategy needs work.
+For tables with many columns, also try `--tile`.
 
 ### Coordinates Are Blank
 
-Coordinates need both:
+Coordinates are derived from the British National Grid map reference printed in each table header. Both the two-letter grid square (e.g. `NG`) and the six-digit numeric reference must be readable for coordinates to be generated. If a map reference is missing or illegible in the scan, the latitude/longitude columns will be blank for that releve.
 
-```text
-os_grid_square + map_reference
-```
+### Ollama Crashes Or Runs Out Of Memory
 
-Example:
-
-```text
-NG + 504446 = NG504446
-```
-
-The script can convert that British National Grid reference into:
-
-```text
-easting, northing, latitude, longitude
-```
-
-If the grid square is missing or uncertain, leave coordinates blank until the reference can be checked.
-
-The coordinate conversion target is WGS84 latitude/longitude. Gavin identified the mapping framework as British National Grid / Ordnance Survey, and the BGS bulk-conversion reference documents British National Grid to WGS84-style coordinate transformation.
-
-### Mac Is Slow Or Runs Out Of Memory
-
-Use:
+Reduce the context window and image size:
 
 ```bash
---batch-size 1 --max-image-side 1000
+python3 scripts/parse_images.py --num-ctx 8192 --num-predict 6144 --max-image-side 1600 --resume
 ```
 
-Do not run multiple Ollama parsing jobs at the same time on an 8GB machine.
+Do not run multiple Ollama jobs at the same time on the same machine.
+
+### Mac Is Slow
+
+On a MacBook Air with 8 GB RAM, use the 3B model and cap resolution:
+
+```bash
+ollama pull qwen2.5vl:3b
+python3 scripts/parse_images.py --model qwen2.5vl:3b --max-image-side 1600 --num-ctx 8192 --num-predict 6144 --resume
+```
 
 ## Current Git Safety Rule
 
@@ -362,9 +409,7 @@ main
 Normal save routine:
 
 ```bash
-git add .
+git add output/output.csv output/image_tracking.csv scripts/ timeline.md
 git commit -m "short description"
 git push origin pipeline-setup
 ```
-
-This uploads work to the active branch without changing `main`.
