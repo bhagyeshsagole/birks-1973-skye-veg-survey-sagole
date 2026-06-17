@@ -436,3 +436,14 @@ The following images have data that cannot be reliably verified from the availab
 - **Image 50** (Table 4.40 continued, page 123) — wide landscape rotation
 - **Image 66** (Table 4.50, page 139) — landscape rotation
 - **Image 69** (Table 4.51, page 142) — landscape rotation
+
+Fixed (2,563 rows cleared): All images where "sparse" was a note about the vegetation table being sparse (lots of absent species) — not a scan quality problem. These are clearly-printed portrait pages and the data is correct as transcribed.
+
+Still flagged (3,284 rows, 11.4%):
+
+5 images need new scans from you — these are the landscape-rotated pages where columns are too cramped or the orientation makes cells unreadable:
+Image 8 (Table 4.8, page 81)
+Images 49 & 50 (Table 4.40, pages 122–123)
+Image 66 (Table 4.50, page 139)
+Image 69 (Table 4.51, page 142)
+Small genuine uncertainties (~189 rows across images 44, 48, 53, 61–65, 67–68) — specific cells or species names that are ambiguous in the existing scans; these are manageable with a manual spot-check if needed.
