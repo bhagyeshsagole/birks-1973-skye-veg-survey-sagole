@@ -20,3 +20,5 @@ claude-instructions.md
 *claude*instructions*.md
 incognito.md
 *incognito*.md
+docs/*_cache/
+docs/*_files/

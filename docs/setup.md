@@ -115,6 +115,32 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Then activate the environment again.
 
+## Render The R Markdown EDA
+
+To render:
+
+```bash
+Rscript docs/render_eda.R
+```
+
+Or knit from RStudio.
+
+The script renders the notebook and then opens the HTML file in your default browser.
+
+If packages are missing, install them first:
+
+```bash
+Rscript docs/install_packages.R
+```
+
+If you only want to render without opening the browser:
+
+```bash
+Rscript docs/render_eda.R --no-open
+```
+
+In VS Code, run the task `Render EDA HTML`.
+
 ## Install And Start Ollama
 
 Install from the official site:
