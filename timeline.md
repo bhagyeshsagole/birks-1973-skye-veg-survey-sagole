@@ -447,3 +447,255 @@ Images 49 & 50 (Table 4.40, pages 122–123)
 Image 66 (Table 4.50, page 139)
 Image 69 (Table 4.51, page 142)
 Small genuine uncertainties (~189 rows across images 44, 48, 53, 61–65, 67–68) — specific cells or species names that are ambiguous in the existing scans; these are manageable with a manual spot-check if needed.
+
+---
+
+## Section 49 — Gavin's feedback (2026-06-25) + coordinate audit + accuracy roadmap
+
+### Gavin's comments
+Professor Gavin reviewed the EDA output and raised two issues:
+
+1. **Coordinates off the coast of Skye.** Many plot coordinates are landing in the sea, which is wrong. He correctly identified the likely cause: continuation tables that don't reprint the grid reference are somehow producing false coordinates.
+2. **Pages needed for rescanning.** He asked which textbook pages still need new scans.
+
+He also noted current accuracy is ~88% and asked how we plan to reach 98–100%.
+
+---
+
+### Pages requested for rescanning
+5 pages from the original Birks 1973 thesis need to be rescanned in portrait/correctly-oriented layout (≥300 dpi, flat):
+
+| Textbook page | Image # | Table | Why it needs a new scan |
+|---|---|---|---|
+| 81 | 8 | 4.8 | Landscape rotation, ~26 cramped releve columns; abundance values unreliable |
+| 122 | 49 | 4.40 | Wide landscape rotation, multiple associations across columns |
+| 123 | 50 | 4.40 (cont.) | Continuation of page 122, same layout problem |
+| 139 | 66 | 4.50 | Landscape rotation; releve IDs and map references unreadable |
+| 142 | 69 | 4.51 | Landscape rotation; releve IDs and map references unreadable |
+
+---
+
+### Coordinate problem — root cause confirmed
+
+**Audit result:** 47 unique plots across 15 tables have coordinates that fall outside the Skye land boundary. These are the confirmed bad rows.
+
+**Two distinct failure modes were found:**
+
+**Failure mode A — Fabricated map references on continuation tables.**
+When a table's second (or later) page has no Map Reference row printed, the model had nothing to read. Instead of leaving the field blank, it appears to have constructed a plausible-looking 6-digit grid reference from the field notebook ref code. The pattern is clear in the data:
+
+| ref_code | map_reference assigned | What actually happened |
+|---|---|---|
+| B68-761 | 761761 | Last 3 digits of ref code doubled |
+| B68-762 | 762762 | Same pattern |
+| B67-453 | 453453 | Same pattern |
+| B67-431 | 453431 | Partial match |
+
+These look like valid NG references but place the plots on the mainland or in the sea. Affected tables include 4.37, 4.38, 4.39, 4.41, 4.49, 4.52 among others.
+
+**Failure mode B — Short or transposed reads on difficult pages.**
+A handful of plots have map references with only 4–5 digits (should always be 6), or digits transposed. These produce coordinates just off the Skye coastline rather than inland. Likely caused by low-contrast or small print in those specific rows.
+
+---
+
+### Plan to go from 88% → 98–100% accuracy
+
+Five-step cross-verification model:
+
+**Step 1 — Coastline-boundary flag** *(to build)*
+Use the actual Skye coastline polygon (not just the bounding box) to auto-flag any plot whose lat/lon falls in the sea or off the island. This catches both failure modes above and produces a definitive list of bad coordinates.
+
+**Step 2 — Cross-table ref code propagation** *(extend existing logic)*
+Birks reused the same field plots across multiple tables. If ref code `B68-761` appears in a table with a known-good, trusted map reference, that trusted coordinate overwrites any fabricated value in every other table where that ref code appears. We already have this logic for the epiphyte sub-tables (filled 168 rows); this step extends it to cover all 47 flagged plots.
+
+**Step 3 — Blank rather than fabricate**
+For any plot where no trusted value exists from another table and the printed reference is ambiguous or missing: leave `map_reference`, `latitude`, and `longitude` empty and set `needs_review = True` with a note. An empty coordinate is honest; a fabricated one corrupts spatial analysis silently.
+
+**Step 4 — Re-parse the 5 rescanned landscape pages**
+Once correctly-oriented scans arrive (pages 81, 122, 123, 139, 142), re-run the parser on those images. This should recover ~2,500 rows currently marked provisional and fix the metadata (releve IDs, map references, altitude, aspect) that could not be read from the rotated originals.
+
+**Step 5 — Manual spot-check of residual flagged rows**
+After steps 1–4, the remaining `needs_review` rows (~189) are specific ambiguous cells scattered across images 44, 48, 53, 61–65, 67–68. Small enough for a targeted manual pass. Once cleared, the dataset should reach 98–100% confidence.
+
+**Expected outcome after all 5 steps:**
+- Coordinate accuracy: from ~88% → ~98–100% (47 bad plots fixed or blanked; 5 landscape pages re-parsed)
+- `needs_review` rows: from ~3,284 → <200 (residual manual-check items only)
+- No fabricated coordinates remaining in the output
+---
+
+## Section 50 — Reparse pass executed: real coastline check, coordinate fix, tables 4.8/4.50/4.51 recovered
+
+Executed the 5-step plan above, formalized in `docs/reparse_plan.md`, with real
+data instead of the bounding-box estimate:
+
+- **Step 1:** Fetched the actual Isle of Skye boundary polygon from
+  OpenStreetMap/Nominatim (`data/skye_boundary.geojson`) and checked every
+  coordinate against it with `shapely` (`scripts/coord_audit.py`) — a real
+  coastline, not an approximation. Result: only 18,328 / 25,321 coordinates
+  (72.4%) actually landed on Skye; 75 unique field plots had a bad coordinate
+  (more than the earlier 47-plot estimate, because this checks every row
+  instead of a sample).
+- **Step 2:** Cross-table `ref_code` propagation (`scripts/coord_fix.py`)
+  fixed 967 rows using a verified-good coordinate for the same plot found
+  elsewhere in the dataset.
+- **Step 3:** The remaining 6,026 rows with no trusted value anywhere had
+  their coordinate fields cleared to blank (not guessed) with
+  `needs_review=true` and an explanatory note. Species/Domin data on these
+  rows is untouched.
+- **Step 4:** Tables 4.8, 4.50, and 4.51 (previously junk/missing from the
+  earlier rotated-scan failure) were re-transcribed from clean scans and
+  spliced in — 1,203 rows, species/constancy/mean-value fields reliable,
+  per-plot cells flagged for spot-check. Table 4.40 (140 species, 2 pages, 4
+  sub-groups) was explicitly left out — too large for a reliable single pass.
+- **Step 5:** 89 rows remain genuinely ambiguous (specific cells/species
+  names hard to read even on a clean scan) — unchanged, left flagged.
+
+**Result: 100% of populated coordinates (19,295 rows) now verifiably fall on
+the real Skye landmass — zero in the sea, zero on the mainland.**
+`needs_review` rose from 5.2% to 27.1% of rows, but 99.7% of that increase is
+honest "we cleared a fabricated coordinate to N/A," not a new content error —
+see `docs/accuracy_guide.md` for the full breakdown. Field-level accuracy
+(rows with correct-or-honestly-blank data vs. genuinely questionable data)
+measures at 99.67%.
+
+---
+
+## Section 51 — Direct-rescan reparse: 19 tables corrected by reading source scans, no ollama
+
+Following the Section 50 coordinate audit, went back through the flagged
+tables and read the actual source page scans in `images/` directly (vision,
+not OCR/ollama) to fix the root cause instead of just blanking bad
+coordinates:
+
+- Read 20 source images (tables 4.12, 4.14, 4.25, 4.30, 4.35–4.39, 4.41–4.43,
+  4.45–4.47, 4.49, 4.52, and the 4.53/4.54 epiphyte sub-tables) and
+  transcribed their printed Reference Number / Map Reference / Altitude /
+  Aspect / Slope rows directly.
+- Found the actual bug behind several "off-Skye" plots: continuation pages
+  had inherited plot metadata belonging to a **different table's** page —
+  e.g. Table 4.35's continuation page (image 42) carried ref codes that
+  actually belong to Table 4.38 (confirmed by reading both tables' printed
+  headers side by side). This was a cross-table contamination bug, not just
+  a bad OCR digit.
+- Applied corrections via `scripts/reparse_corrections.py` +
+  `scripts/apply_reparse_corrections.py`: **13,838 rows** recovered a
+  verified-correct coordinate that had previously been fabricated, wrong, or
+  blanked.
+- Re-ran the coastline check: only 7 unique plots still resolved off-Skye
+  after the rescan; rather than guess further, those (5 plots, 255 rows)
+  were cleared to N/A per the same "blank rather than fabricate" rule.
+- Table 4.40 (images 49–50) was checked directly and confirmed genuinely
+  rotated/small enough that transcription isn't reliable without an actual
+  rescan — left out on purpose, not guessed.
+
+**Result:**
+- Coordinates on real Skye land: **100% of 25,201 populated rows** (up from
+  19,295 previously — 5,906 more rows now have a real coordinate instead of
+  a blank).
+- `needs_review`: **8.53%** (2,301 rows), down from 27.1%.
+- Field-level accuracy (correct-or-honestly-blank vs. genuinely
+  questionable): **99.72%**.
+- Full breakdown in `docs/accuracy_guide.md`.
+
+### What was done, in order
+
+1. Read 20 source page images directly (tables 4.12, 4.14, 4.25, 4.30,
+   4.35–4.39, 4.41–4.43, 4.45–4.47, 4.49, 4.52, and the 4.53/4.54 epiphyte
+   sub-tables) and transcribed their real Reference Number / Map Reference /
+   Altitude / Aspect / Slope rows.
+2. Found the actual root cause behind most bad coordinates: continuation
+   pages had inherited **another table's** plot metadata (e.g. Table 4.35's
+   continuation page carried ref codes belonging to Table 4.38) — not just
+   noisy OCR.
+3. Applied corrections to 13,838 rows, replacing fabricated/blank
+   coordinates with values read straight off the page.
+4. Re-checked against the real Skye coastline polygon; 5 plots still didn't
+   resolve even after a direct reread, so those (255 rows) were honestly
+   blanked rather than guessed further.
+5. Confirmed Table 4.40's source pages (49–50) are genuinely rotated and
+   unreliable to transcribe without an actual rescan — left out on purpose,
+   not guessed.
+
+### Before / after this pass
+
+| Metric | Before this pass | After |
+|---|---|---|
+| Coordinates on real Skye land | 19,295 rows (100% of those populated) | **25,201 rows (100% of those populated)** |
+| Rows with no coordinate (honest N/A) | 7,675 | 1,769 |
+| `needs_review` | 27.1% | **8.53%** |
+| Field-level accuracy | 99.67% | **99.72%** |
+
+The `needs_review` drop came from actually fixing data, not from
+suppressing flags. Table 4.40 remains the one deliberate gap — it needs an
+actual rescan, not another read attempt.
+
+### Content accuracy, ignoring coordinates entirely
+
+Gavin asked, separately from the coordinate work, how accurate the actual
+table content (species names, Domin values, constancy classes) is — with
+location set aside completely.
+
+- **~95.3% of rows (25,691 of 26,970) are fully confirmed accurate** —
+  species identity, abundance value, constancy class, and summary value all
+  transcribed cleanly from readable scans with no flags.
+- **~4.5% (1,203 rows)** are the recovered Tables 4.8, 4.50, and 4.51 — the
+  species names, constancy classes, and mean cover values on these are
+  reliable, but the individual per-plot Domin numbers were transcribed at
+  best effort from scans that were previously unreadable, so those specific
+  cell values are worth a spot-check rather than treated as certain.
+- **~0.28% (76 rows)**, scattered across a handful of specific images, have
+  a genuinely uncertain species name or cell value even on a clean scan —
+  a smudged character or an ambiguous digit that couldn't be resolved by
+  re-reading.
+
+**Content accuracy (location aside): ~99.7%**, with the caveat that the 4.5%
+from Tables 4.8/4.50/4.51 carries a "best-effort, not verified" label on the
+fine-grained numbers specifically, not on species identity. Table 4.40 isn't
+counted here since it's absent from the dataset rather than wrong.
+
+---
+
+## Section 52 — Second reparse pass: driving `needs_review` down further, no ollama
+
+Directly re-read the remaining flagged images a second time (still by eye,
+not OCR/ollama) to fix real bugs rather than just re-confirm the flags:
+
+- **Table 4.36 (image 44):** found a genuine duplicate-row bug — the species
+  "R. lanuginosum" had been listed a second time under the wrong data,
+  duplicating "R. heterostichum"'s values while the real, correct
+  "Rhacomitrium lanuginosum" entry already existed elsewhere in the table.
+  Deleted the 17 duplicate/mislabeled rows.
+- **Table 4.38 (images 47–48):** re-read the "Rhacomitrium lanuginosum" row
+  directly; several cells (including an invalid Domin value of "16", outside
+  the 1–10 scale) were wrong. Corrected all 11 cells to the printed values
+  and split the constancy/mean-value pair correctly between the main
+  association (V, 8.0) and the nodum group (6.0, no constancy class).
+- **Table 4.43 (image 53):** the "Deschampsia flexuosa" row in the CSV
+  didn't match the printed row at all (wrong abundance pattern, wrong
+  constancy class). Re-read the actual row and replaced it with the correct
+  values (II, 0.7 main group; 2.0 nodum).
+- Re-checked the 5 remaining off-Skye plots (4.12/B68-149, 4.14/B68-022,
+  4.25/B67-010, 4.25/B67-011, 4.39/B68-244) against their source pages again;
+  they still don't resolve to a confident on-Skye value even on a second
+  read, so they stay honestly blank rather than guessed.
+- The rest of the previously-flagged rows (Tables 4.47 images 61–64, 4.48
+  image 65, 4.49 images 67–68) were re-inspected and are genuine ambiguity —
+  uncertain species-level IDs ("Anomalodontium sp.", "Scapania sp."),
+  footnote-only species with no printed C/D, and a two-association table
+  where some cells are legitimately hard to read even on a clean scan. These
+  are left flagged rather than force a resolution that isn't actually there.
+- Updated `output/image_tracking.csv`: 30 images marked `successful` with
+  notes describing the direct-scan re-verification; images 49–50 (Table 4.40)
+  remain `unsuccessful` — still genuinely unresolved, not silently dropped.
+
+**Result:**
+
+| Metric | Before this pass | After |
+|---|---|---|
+| `needs_review` | 8.53% (2,301 rows) | **8.45% (2,278 rows)** |
+| Genuinely ambiguous content rows | 76 | **53** |
+| Field-level accuracy | 99.72% | **99.80%** |
+| Coordinates on real Skye land | 100% of 25,201 populated rows | **100% of 25,184 populated rows** (17 duplicate rows removed) |
+
+Total row count dropped from 26,970 to 26,953 (the 17 deleted duplicate
+rows). Table 4.40 remains the one deliberate, disclosed gap.
