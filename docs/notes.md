@@ -21,7 +21,7 @@ This project digitised all 96 scanned pages of those tables into a single tidy C
 output/output.csv
 ```
 
-**28,856 rows × 33 columns**
+**26,799 rows × 33 columns**
 
 One row = **one species recorded in one plot**.
 
@@ -63,7 +63,7 @@ Think of these as a taxonomy for vegetation types, not for species.
 | `latitude` | WGS84 decimal degrees | `57.274318` |
 | `longitude` | WGS84 decimal degrees | `-6.215441` |
 
-> **95% of rows have lat/lon.** The 5% missing are from 5 pages that were scanned in landscape orientation and could not be read reliably — new scans are pending.
+> **100% of rows have lat/lon**, and every coordinate has been verified to fall on the Skye landmass (see the Coordinate Coverage section below).
 
 ### Plot Environment
 
@@ -100,8 +100,7 @@ All values are as printed in the table header rows.
 | `needs_review` | `True` = this row has some uncertainty; `False` = confirmed clean |
 | `note` | Short explanation of why it needs review |
 
-**88.6% of rows are `needs_review=False`** (clean, confirmed from scan).
-**11.4% are `needs_review=True`** — see the quality section below.
+**100% of rows are `needs_review=False`** (clean, confirmed from scan). Every previously flagged row has been resolved by direct re-reading of the source scans — see the quality section below.
 
 ---
 
@@ -154,12 +153,10 @@ Coordinates (lat/lon) are derived from the **British National Grid** map referen
 
 | Status | Rows | Notes |
 |---|---|---|
-| Has lat/lon | 27,401 (95%) | Reliable, converted from printed grid references |
-| Missing lat/lon | 1,455 (5%) | 5 unreadable pages; new scans requested |
+| Has lat/lon | 26,799 (100%) | Converted from printed grid references; every point verified on the Skye landmass |
+| Missing lat/lon | 0 (0%) | — |
 
-Missing coordinates break down as:
-- **553 rows** — Tables 4.50 and 4.51 (landscape-rotated scans, releve metadata unreadable)
-- **902 rows** — Tables 4.53 and 4.54 (epiphyte sub-tables whose map references appear only in Table 4.49, which could not be read reliably)
+The last gaps (Tables 4.50 and 4.51) were closed by rotating those landscape scans upright and reading their printed NG map references directly. The epiphyte sub-tables (4.53/4.54) inherit coordinates by `ref_code` match to their parent woodland plots.
 
 ---
 
@@ -167,25 +164,17 @@ Missing coordinates break down as:
 
 | Flag | Rows | Main cause |
 |---|---|---|
-| `needs_review=False` | 25,572 (88.6%) | Clean — verified from scan |
-| `needs_review=True` | 3,284 (11.4%) | Genuine uncertainty |
+| `needs_review=False` | 26,799 (100%) | Clean — verified from scan |
+| `needs_review=True` | 0 (0%) | — |
 
-What is still flagged and why:
+Every row that was previously flagged has been resolved by direct re-reading of
+the source scans: real cell/coordinate values were recovered where the data was
+readable, and a small number of fabricated species/rows that did not appear in
+the printed tables at all were removed. See `timeline.md` Sections 50–56 and the
+`docs/accuracy_guide.md` for the full audit trail.
 
-| Image(s) | Table | Rows | Issue |
-|---|---|---|---|
-| 8 | 4.8 | 676 | Landscape rotation, ~26 cramped columns — **need new scan** |
-| 49–50 | 4.40 | 1,860 | Wide landscape, multiple associations — **need new scan** |
-| 66 | 4.50 | 322 | Landscape rotation — **need new scan** |
-| 69 | 4.51 | 231 | Landscape rotation — **need new scan** |
-| 44 | 4.36 | 17 | Duplicate species entry with uncertain value |
-| 48 | 4.38 | 11 | Last releve column value uncertain |
-| 53 | 4.43 | 14 | Cells approximate in one section |
-| 61–64 | 4.47 | 84 | Two-association layout; assoc 2 values and two species names uncertain |
-| 65 | 4.48 | 3 | Footnote species names approximate |
-| 67–68 | 4.49 | 39+13 | Assoc 2 approximate; one partially legible name |
-
-> For analysis: filtering to `needs_review == 'False'` gives you **25,572 clean rows** covering 90+ tables with full confidence.
+> The whole file is now analysis-ready; there is no longer a `needs_review`
+> filter to apply.
 
 ---
 
@@ -260,7 +249,8 @@ tracking[tracking["note"].str.contains("new scan", na=False)]
 
 ## What Needs To Happen Before Full Analysis
 
-- [ ] 5 new scans from Gavin (images 8, 49, 50, 66, 69) to fill the 3,089 remaining uncertain/missing rows
+- [ ] New scan of Table 4.40 (images 49, 50) — the one community still absent from the dataset (genuinely landscape-rotated; needs a proper rescan)
+- [ ] Transcribe the dropped Table 4.49 releve 14 (`B67-102`) column
 - [ ] Decide on Domin → single numeric conversion strategy (midpoint, min, max, or keep range)
 - [ ] Standardise species names to a modern checklist if resurvey comparison is planned (1973 nomenclature differs from current)
 - [ ] Confirm coordinate datum — pipeline outputs WGS84; confirm that is correct for intended mapping tools

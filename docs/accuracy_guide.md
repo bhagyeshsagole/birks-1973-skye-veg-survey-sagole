@@ -38,13 +38,18 @@ this way (`scripts/reparse_corrections.py` + `scripts/apply_reparse_corrections.
 recovering **13,838 rows** with a verified-correct coordinate instead of a
 blank.
 
-**Final result:**
+**Final result (after the Section 56 accuracy-cleanup pass):**
 
 | Metric | Value |
 |---|---|
-| Rows with a coordinate | 26,148 |
-| Coordinates verified on real Skye land | **26,148 / 26,148 (100%)** |
-| Rows with no coordinate (honest N/A, no trusted value found anywhere) | 747 (2.8%) |
+| Rows with a coordinate | 26,799 |
+| Coordinates verified on real Skye land | **26,799 / 26,799 (100%)** |
+| Rows with no coordinate | **0 (0%)** |
+
+The last 747 blank rows (Tables 4.50 and 4.51) were resolved by rotating those
+two landscape scans upright and reading the printed 6-digit NG map references
+directly — see `timeline.md` Section 56. Every row in the dataset now carries a
+coordinate verified on the Skye landmass.
 
 Every coordinate in the file is now backed by one of: (a) a plot metadata
 row read directly from the printed scan, (b) a cross-table `ref_code` match
@@ -57,10 +62,11 @@ wrong**, and every plot that had a confident locality match now has one
 (the last holdout, Table 4.14's "Loch nan Eilean," resolved on a retry with
 a Skye-bounded search).
 
-The remaining 747 blank rows are all Tables 4.50 and 4.51, which never had a
-legible map reference in this pass — they do have real printed locality
-names ("Near Allt Strollamus," "E side Loch na Dal," "Tokavaig," etc.) and
-are the natural next candidate for the same geocoding method.
+There are no remaining blank rows. Tables 4.50 and 4.51 — the last holdouts —
+were resolved not by geocoding their locality names but by rotating the
+landscape scans upright, which made every printed 6-digit NG map reference
+legible; the transcribed references cross-check exactly against the same grid
+references already trusted in other tables.
 
 ## 2. Table-cell / transcription accuracy
 
@@ -68,8 +74,8 @@ are the natural next candidate for the same geocoding method.
 |---|---|---|---|
 | **Total flagged (`needs_review=true`)** | **0** | **0.00%** | Nothing in the current dataset is marked as questionable |
 
-**Field-level accuracy: 100%** of the 26,895 rows currently in the dataset
-(`(26,895 − 0) / 26,895`). This isn't the same as "every value is certainly
+**Field-level accuracy: 100%** of the 26,799 rows currently in the dataset
+(`(26,799 − 0) / 26,799`). This isn't the same as "every value is certainly
 right" — it means every row has either been read from a clean, legible
 source, cross-verified, or removed if it couldn't be confirmed. See below
 for what specifically changed to get here.
@@ -114,9 +120,10 @@ Four direct-scan passes (`timeline.md` Sections 52–55) closed the gap:
   the dataset. Its source pages (images 49–50) were checked directly and
   confirmed to be rotated/small enough that a reliable transcription isn't
   achievable without a proper rescan.
-- Tables 4.50 and 4.51 (747 rows) have no coordinate — no map reference was
-  legible on those source pages, and the locality-geocoding method used
-  elsewhere hasn't been applied to them yet.
+- **Table 4.49 releve 14** (field ref `B67-102`): the upright read of image 67
+  shows a 14th releve column that the original transcription dropped; the
+  dataset currently holds releves 1–13 for that table. Recovering it needs its
+  full species column transcribed.
 
 ## How to re-run this check
 

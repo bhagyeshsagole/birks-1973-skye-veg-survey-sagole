@@ -3,7 +3,7 @@ pkgs <- c(
   "dplyr", "tidyr", "readr", "stringr", "forcats", "purrr", "tibble",
   "ggplot2", "ggrepel", "patchwork", "RColorBrewer", "scales",
   "vegan", "cluster", "knitr", "kableExtra", "here", "glue",
-  "leaflet", "plotly", "DT", "htmltools", "rmarkdown", "indicspecies", "permute"
+  "leaflet", "plotly", "DT", "htmltools", "rmarkdown", "indicspecies", "permute", "sf"
 )
 
 missing <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
