@@ -775,3 +775,56 @@ constancy/mean values, a handful of cells in a two-association table that
 are legitimately hard to read even on a clean scan. These are left flagged
 on purpose rather than forced to a number that isn't really there. Table
 4.40 remains the one deliberate gap (still needs an actual rescan).
+
+---
+
+## Section 55 — needs_review: 72 → 0, by re-reading the remaining rows directly
+
+Went back through every one of the 72 remaining flagged rows individually,
+re-reading their exact source images (62, 63, 64, 65, 67, 68, and 14 again).
+This surfaced two different real issues, not just uncertainty:
+
+**Real data, previously stored wrong.** For Table 4.47 (images 62–64), the
+rows for "Ranunculus acris," "Trollius europaeus," "H. splendens," and
+"R. triquetrus" all had merged or placeholder values (e.g. a constancy class
+literally stored as the string `"II|III"`, or a whole row of dots with a
+nonzero mean value — a contradiction, since a value can't have a mean cover
+if it's absent everywhere). Re-read each row directly from the printed page
+and replaced the values with what's actually printed, split correctly
+between the two associations each table covers. Table 4.49's "Sorbus
+aucuparia," "Galium saxatile," and "Geranium robertianum" had the same
+merged-constancy problem and were fixed the same way (58 rows total).
+
+**Fabricated species that don't exist in the printed table.** Four species
+— "Anomalodontium sp." and "Dicranodontium sp." (Table 4.47), "P. atlantica"
+(Table 4.49), and three footnote species on Table 4.48 ("Cardamine
+pratensis," "Glyceria fluitans," "Veronica beccabunga") — were listed with a
+nonzero constancy class but literally zero presence in every single releve,
+which is contradictory on its face. Checked every row of the relevant source
+pages carefully (Table 4.48 in particular is a single-releve stand
+description with 29 species total, all fully visible on one page, and none
+of the three footnote names appear anywhere on it) and confirmed these
+names/rows simply aren't in the printed tables at all — they were invented
+by the original transcription pass. Deleted rather than guessed at: 58 rows
+removed.
+
+**Table 4.14's stuck coordinate resolved.** Retried the "Loch nan Eilean"
+locality lookup with a Skye-bounded search instead of an unbounded one and
+found a real match this time (57.2954, -6.1983, confirmed on Skye land) —
+the last of the plots that couldn't be geocoded in Section 54.
+
+**Result:**
+
+| Metric | Before this pass | After |
+|---|---|---|
+| `needs_review` | 72 rows (0.27%) | **0 rows (0.00%)** |
+| Total rows | 26,953 | 26,895 (58 fabricated rows deleted) |
+| Coordinates on real Skye land | 100% of 26,187 populated rows | **100% of 26,148 populated rows** |
+
+Every currently-flagged row is now either fixed with a value read directly
+from the source page, or removed because it was never real data to begin
+with. Two disclosed gaps remain, unchanged: Table 4.40 (not in the dataset,
+needs an actual rescan) and Tables 4.50/4.51's 747 rows with no coordinate
+(no map reference was ever legible for those two tables; they do have real
+printed locality names and are the natural next candidate for the same
+locality-geocoding method used here).

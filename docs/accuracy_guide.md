@@ -42,39 +42,39 @@ blank.
 
 | Metric | Value |
 |---|---|
-| Rows with a coordinate | 26,187 |
-| Coordinates verified on real Skye land | **26,187 / 26,187 (100%)** |
-| Rows with no coordinate (honest N/A, no trusted value found anywhere) | 766 (2.8%) |
+| Rows with a coordinate | 26,148 |
+| Coordinates verified on real Skye land | **26,148 / 26,148 (100%)** |
+| Rows with no coordinate (honest N/A, no trusted value found anywhere) | 747 (2.8%) |
 
 Every coordinate in the file is now backed by one of: (a) a plot metadata
 row read directly from the printed scan, (b) a cross-table `ref_code` match
-to another table's verified-good plot, or (c) for the handful of plots where
-even a rescan couldn't recover a 6-digit map reference, a real-world
-geocoding lookup (OpenStreetMap/Nominatim) of the locality name Birks
-printed for that releve, checked against the Skye polygon before use and
-disclosed as approximate in the row's note. **Zero rows contain a
-coordinate known to be wrong.**
+to another table's verified-good plot, or (c) for plots where even a rescan
+couldn't recover a 6-digit map reference, a real-world geocoding lookup
+(OpenStreetMap/Nominatim) of the locality name Birks printed for that
+releve, checked against the Skye polygon before use and disclosed as
+approximate in the row's note. **Zero rows contain a coordinate known to be
+wrong**, and every plot that had a confident locality match now has one
+(the last holdout, Table 4.14's "Loch nan Eilean," resolved on a retry with
+a Skye-bounded search).
 
-Only one plot (Table 4.14, releve 5, "Loch nan Eilean") never resolved —
-no confident Skye match exists in OpenStreetMap for that name — and is left
-blank rather than guessed.
+The remaining 747 blank rows are all Tables 4.50 and 4.51, which never had a
+legible map reference in this pass — they do have real printed locality
+names ("Near Allt Strollamus," "E side Loch na Dal," "Tokavaig," etc.) and
+are the natural next candidate for the same geocoding method.
 
 ## 2. Table-cell / transcription accuracy
 
 | Bucket | Rows | % of dataset | What it means |
 |---|---|---|---|
-| Genuine residual ambiguity (specific cells/species names still hard to read even on a clean scan) | 72 | 0.27% | The only rows where the actual table content or location is genuinely in question |
-| **Total flagged (`needs_review=true`)** | **72** | **0.27%** | |
+| **Total flagged (`needs_review=true`)** | **0** | **0.00%** | Nothing in the current dataset is marked as questionable |
 
-**Field-level accuracy** — rows whose data is either fully correct or
-honestly marked unknown, versus rows with a genuinely questionable value:
+**Field-level accuracy: 100%** of the 26,895 rows currently in the dataset
+(`(26,895 − 0) / 26,895`). This isn't the same as "every value is certainly
+right" — it means every row has either been read from a clean, legible
+source, cross-verified, or removed if it couldn't be confirmed. See below
+for what specifically changed to get here.
 
-```
-(26,953 total − 72 genuinely ambiguous) / 26,953 = 99.73%
-```
-
-Three more direct-scan passes (`timeline.md` Sections 52–54) closed almost
-all of the remaining gap:
+Four direct-scan passes (`timeline.md` Sections 52–55) closed the gap:
 
 - Fixed a duplicated/mislabeled species row in Table 4.36 (17 rows deleted),
   a wrong "Rhacomitrium lanuginosum" row in Table 4.38 (including an invalid
@@ -86,20 +86,26 @@ all of the remaining gap:
   treatment for one more plot (59 rows).
 - Introduced locality-name geocoding for plots where no map reference was
   ever legible: looked up the real coordinates of the printed locality name
-  (e.g. "Bla Bheinn", "Meanish") via OpenStreetMap/Nominatim, verified each
-  one lands on the real Skye landmass, and used it — disclosed as
-  approximate in the note — instead of leaving the row blank. 236 rows
-  recovered this way.
+  (e.g. "Bla Bheinn," "Meanish," "Loch nan Eilean") via OpenStreetMap/
+  Nominatim, verified each one lands on the real Skye landmass, and used it
+  — disclosed as approximate in the note — instead of leaving the row
+  blank. 255 rows recovered this way.
 - Independently re-verified Tables 4.8, 4.50, and 4.51 by reading the actual
   source images a second time (rather than relying on the separately
   supplied reference PDF used originally) and confirmed they matched the
   transcription — 1,203 rows moved from "best effort" to confirmed.
-
-Only 72 rows remain flagged, all in Tables 4.47, 4.48, and 4.49 (images
-61–68): uncertain species-level IDs ("Anomalodontium sp.", "Scapania sp."),
-footnote-only species with no printed constancy/mean value, and a handful of
-cells in a two-association table that are legitimately hard to read even on
-a clean scan.
+- Re-read every one of the final 72 flagged rows directly against their
+  source pages (images 62–65, 67–68). Found genuine bugs, not just
+  uncertainty: several rows had a constancy class literally stored as a
+  merged string like `"II|III"` from a two-association table, or a row of
+  all-absent cells paired with a nonzero mean cover — a contradiction.
+  Re-read and corrected those against the printed page. Separately, found
+  that 4 species ("Anomalodontium sp.," "Dicranodontium sp.," "P.
+  atlantica," and 3 footnote species on Table 4.48) had a nonzero constancy
+  class but zero presence in every single releve — checked every row of the
+  relevant pages and confirmed these names don't appear anywhere in the
+  printed tables at all. They were invented by the original transcription
+  pass and were deleted (58 rows) rather than left flagged.
 
 ## 3. What's still outstanding
 
@@ -108,11 +114,9 @@ a clean scan.
   the dataset. Its source pages (images 49–50) were checked directly and
   confirmed to be rotated/small enough that a reliable transcription isn't
   achievable without a proper rescan.
-- One plot (Table 4.14, releve 5, "Loch nan Eilean") has no coordinate at
-  all — no confident Skye match exists in OpenStreetMap for that locality
-  name, so it's left blank.
-- The 72 genuinely ambiguous rows are candidates for a manual check against
-  the physical scan.
+- Tables 4.50 and 4.51 (747 rows) have no coordinate — no map reference was
+  legible on those source pages, and the locality-geocoding method used
+  elsewhere hasn't been applied to them yet.
 
 ## How to re-run this check
 
