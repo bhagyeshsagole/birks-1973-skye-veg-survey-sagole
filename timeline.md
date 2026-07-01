@@ -699,3 +699,10 @@ not OCR/ollama) to fix real bugs rather than just re-confirm the flags:
 
 Total row count dropped from 26,970 to 26,953 (the 17 deleted duplicate
 rows). Table 4.40 remains the one deliberate, disclosed gap.
+
+# IMAGE TRACKING DASHBOARD - Birks 1973 Skye Vegetation Survey
+# Updated: 2026-07-01T18:46:40+00:00
+# Images: 96 total, 94 successful, 2 unsuccessful
+# Unsuccessful images (need a real rescan): 49, 50 (Table 4.40)
+# output.csv: 26953 rows across 54 tables, needs_review=2278 (8.45%)
+#
