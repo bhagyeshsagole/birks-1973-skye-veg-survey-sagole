@@ -7,7 +7,7 @@ required_pkgs <- c(
   "dplyr", "tidyr", "readr", "stringr", "forcats", "purrr", "tibble",
   "ggplot2", "ggrepel", "patchwork", "RColorBrewer", "scales",
   "vegan", "cluster", "knitr", "kableExtra", "here", "glue",
-  "leaflet", "plotly", "DT", "htmltools", "rmarkdown"
+  "leaflet", "plotly", "DT", "htmltools", "rmarkdown", "indicspecies", "permute"
 )
 
 if (!file.exists(input_file)) {
