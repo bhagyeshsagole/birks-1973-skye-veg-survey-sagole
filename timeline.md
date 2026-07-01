@@ -828,3 +828,80 @@ needs an actual rescan) and Tables 4.50/4.51's 747 rows with no coordinate
 (no map reference was ever legible for those two tables; they do have real
 printed locality names and are the natural next candidate for the same
 locality-geocoding method used here).
+
+---
+
+## Section 56 — Accuracy-cleanup pass: four residual data-quality issues fixed
+
+An independent audit of `output/output.csv` found the species-by-plot
+transcription strong but flagged four things that kept the file from being
+fully clean/analysis-ready: 747 rows with no coordinate, 96 duplicate
+species-plot keys, non-numeric codes in numeric aspect/slope fields, and
+pipe-packed summary values in Table 4.47. All four were fixed
+deterministically or by reading the source scans directly (no ollama), via a
+single documented, re-runnable script (`scripts/fix_accuracy_pass.py`, backup
+at `output/output.csv.pre_accuracy_pass.bak`).
+
+**Issue 2 — 96 duplicate species-plot keys (192 rows) → merged.**
+Each affected species (10 species across Tables 4.39, 4.41, 4.44, 4.46, 4.47,
+4.52) had been transcribed as *two partial rows* that each captured a
+different subset of the printed row's presence marks — e.g. *Oxalis
+acetosella* in 4.47 had one copy marking releve 5 and another marking releve
+9, and its printed constancy I / mean 1.4 is exactly right for a species
+present in 2 of 14 plots. Verified there were **zero** rows where the two
+copies disagreed on a present value and **zero** rows with two different
+non-blank constancy/mean values, so the merge (union the presence marks, keep
+the single non-blank summary) is an unambiguous reconstruction, not a guess.
+96 rows removed.
+
+**Issue 4 — pipe-packed sub-association summaries (845 cells) → split.**
+Tables 4.47 and 4.49 are two-sub-association tables; each species has a
+separate constancy/mean-cover pair per sub-association, which had been packed
+into one field as "A|B" (e.g. `V|I`, `7.1|0.3`). Read the source scans
+(images 61, 67) and confirmed the printed C/D column pairs split at releve
+7|8 in 4.47 and 6|7 in 4.49 — the two named diagnostic species of each first
+sub-association are present in exactly the first block of releves. Each
+observation now carries the single value for the sub-association its releve
+belongs to (e.g. *Betula pubescens* in 4.47: V/7.1 on releves 1–7, I/0.3 on
+releves 8–14).
+
+**Issue 3 — non-numeric aspect/slope codes (3 plots) → blanked + noted.**
+Read images 19, 20, 27. The printed marks (`o.N.`, `E.`, `.`) are genuine
+Birks annotations, not degree values, so the numeric fields are left blank
+and the raw mark preserved in the row note. Table 4.19 releve 4 was doubly
+wrong — the CSV had put the slope's `o.N.` into aspect and invented a slope
+of 5; both are now corrected to blank.
+
+**Issue 1 — 747 rows with no coordinate (Tables 4.50, 4.51) → recovered exactly.**
+The map references on these two tables were never actually illegible — the
+parser had only ever seen the *un-rotated* landscape scans. Rotating images
+66 and 69 upright makes every printed 6-digit NG map reference perfectly
+legible. Transcribed all 27 releve references, converted NG → WGS84 offline
+with the pipeline's own converters, and verified every point on the real Skye
+landmass. As independent confirmation, the majority of the transcribed
+references (e.g. 707157, 596267, 750250, 703145) **exactly match** trusted
+coordinates already present for the same grid reference in other tables. This
+gives *exact* grid-reference coordinates, not the approximate
+locality-geocoding that was previously the fallback plan. Also corrected
+Table 4.50 releve 14's `ref_code` (scan reads `B68-298`; CSV had a misread
+`B68-208`, which had been spuriously matching Table 4.4).
+
+**Result:**
+
+| Metric | Before this pass | After |
+|---|---|---|
+| Total rows | 26,895 | 26,799 (96 duplicate rows merged away) |
+| Rows with no coordinate | 747 (2.78%) | **0 (0.00%)** |
+| Coordinates on real Skye land | 100% of 26,148 populated | **100% of 26,799 populated** |
+| Duplicate species-plot keys | 96 | **0** |
+| Pipe-packed summary/constancy cells | 845 | **0** |
+| Non-numeric aspect/slope fields | 3 plots | **0** |
+
+Regression checks after the pass: 0 invalid `presence_binary`, 0
+"present=0 but cover>0" contradictions, 0 invalid Domin codes.
+
+**Newly found, left for a follow-up (out of scope for this pass):** the
+upright read of image 67 shows Table 4.49 has **14** releve columns (the last
+being ref `B67-102`), but the CSV holds only 13 — releve 14 was dropped in
+the original transcription and would need its full species column
+transcribed to recover.
