@@ -700,9 +700,32 @@ not OCR/ollama) to fix real bugs rather than just re-confirm the flags:
 Total row count dropped from 26,970 to 26,953 (the 17 deleted duplicate
 rows). Table 4.40 remains the one deliberate, disclosed gap.
 
+---
+
+## Section 53 — `image_tracking.csv` redesigned as a dashboard + simplified table
+
+Reworked `output/image_tracking.csv` to be simple to read at a glance:
+dropped the always-empty/redundant columns (`plots_detected`,
+`tables_detected`, `last_attempt_at`, `error_type`, `error_message`), keeping
+only `image_number`, `image_file`, `status`, `observations_added`, `note`.
+The stale ollama-crash error message on images 49/50 was replaced with the
+actual current reason (genuinely rotated scan, needs a real rescan, not
+another reread).
+
+A 6-line dashboard header was added at the top of the file, regenerated from
+the live data each time the file is rebuilt:
+
+```
 # IMAGE TRACKING DASHBOARD - Birks 1973 Skye Vegetation Survey
 # Updated: 2026-07-01T18:46:40+00:00
 # Images: 96 total, 94 successful, 2 unsuccessful
 # Unsuccessful images (need a real rescan): 49, 50 (Table 4.40)
 # output.csv: 26953 rows across 54 tables, needs_review=2278 (8.45%)
 #
+```
+
+Caveat: these `#`-prefixed lines aren't standard CSV — they're for human
+readability, not machine parsing. If `scripts/_build_from_vision.py` is ever
+run again it will regenerate `image_tracking.csv` from scratch in the old
+plain format and wipe this dashboard header unless that script is updated to
+be dashboard-aware.
