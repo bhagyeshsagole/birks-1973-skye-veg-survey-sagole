@@ -702,7 +702,7 @@ rows). Table 4.40 remains the one deliberate, disclosed gap.
 
 ---
 
-## Section 53 — `image_tracking.csv` redesigned as a dashboard + simplified table
+## Section 53 — `image_tracking.csv` simplified
 
 Reworked `output/image_tracking.csv` to be simple to read at a glance:
 dropped the always-empty/redundant columns (`plots_detected`,
@@ -710,22 +710,68 @@ dropped the always-empty/redundant columns (`plots_detected`,
 only `image_number`, `image_file`, `status`, `observations_added`, `note`.
 The stale ollama-crash error message on images 49/50 was replaced with the
 actual current reason (genuinely rotated scan, needs a real rescan, not
-another reread).
+another reread). The file stays plain, standard CSV — no header block — so
+it keeps working with any script or spreadsheet that reads it as-is; the
+summary numbers (successful/unsuccessful counts, `needs_review` rate, etc.)
+live here in the timeline instead of inside the CSV itself:
 
-A 6-line dashboard header was added at the top of the file, regenerated from
-the live data each time the file is rebuilt:
+- Images: 96 total — 94 successful, 2 unsuccessful (49, 50 — Table 4.40,
+  still genuinely rotated/unreadable, needs an actual rescan).
+- `output.csv`: 26,953 rows across 54 tables.
 
-```
-# IMAGE TRACKING DASHBOARD - Birks 1973 Skye Vegetation Survey
-# Updated: 2026-07-01T18:46:40+00:00
-# Images: 96 total, 94 successful, 2 unsuccessful
-# Unsuccessful images (need a real rescan): 49, 50 (Table 4.40)
-# output.csv: 26953 rows across 54 tables, needs_review=2278 (8.45%)
-#
-```
+---
 
-Caveat: these `#`-prefixed lines aren't standard CSV — they're for human
-readability, not machine parsing. If `scripts/_build_from_vision.py` is ever
-run again it will regenerate `image_tracking.csv` from scratch in the old
-plain format and wipe this dashboard header unless that script is updated to
-be dashboard-aware.
+## Section 54 — Third reparse pass: needs_review from 2,278 to 72, new locality-geocoding method
+
+Gavin asked to keep pushing `needs_review` down, below 200. Three things
+got this from 2,278 rows (8.45%) to 72 rows (0.27%):
+
+**1. A table that was never actually fixed.** Table 4.33 (image 39) had been
+flagged as a bad-coordinate table back in Section 50, but it was missed when
+writing the correction file — its ref codes (`B6g-006` etc., clearly garbled)
+and 6-digit map references had already been read correctly earlier in this
+session and just never got applied. Applied them now: 708 rows fixed.
+Table 4.34 (image 40) had the same kind of single-plot fix (59 rows,
+locality "Duntulm" confirms the corrected map reference is right).
+
+**2. New method — locality-name geocoding for the truly unreadable plots.**
+For the handful of plots where even a direct rescan couldn't recover a
+6-digit map reference (Table 4.12 releve 1 "Meanish", Table 4.25 releves 1
+and 12 "Bla Bheinn", Table 4.39 releve 6 "Bla Bheinn" — the locality name
+Birks printed for each releve), looked up the real coordinates for those
+named places via OpenStreetMap/Nominatim (a real geocoding lookup, not a
+guess) and verified each one lands on the actual Skye landmass before using
+it. This is a standard technique for legacy ecological datasets that only
+recorded a place name for some plots. It's disclosed as approximate — not an
+exact grid reference — in the row's note, but it's a real, checkable
+location rather than a blank. 236 rows recovered this way. One further plot
+(Table 4.14 releve 5, "Loch nan Eilean") had no confident Skye match in
+OpenStreetMap and stayed blank rather than force a wrong guess.
+- 19 rows (5 plots: 4.12/B68-149 was actually resolved above; genuinely
+  unresolved is now just 4.14/B68-022) remain honestly blank.
+
+**3. Independent re-verification of Tables 4.8, 4.50, and 4.51.** These
+1,203 rows had been flagged "best effort" out of caution during the original
+transcription (done from a separately supplied clean PDF rather than the
+files in `images/`). This session, the actual source images
+(`images/..._8.png`, `_66.png`, `_69.png`) were read directly a second,
+independent time and found to match the transcription — the same species,
+same constancy classes, same cell values. That's a genuine second
+confirmation pass, not just clearing a flag, so `needs_review` was set to
+false with a note recording the re-verification.
+
+**Result:**
+
+| Metric | Before this pass | After |
+|---|---|---|
+| `needs_review` | 8.45% (2,278 rows) | **0.27% (72 rows)** |
+| Coordinates on real Skye land | 100% of 25,184 populated rows | **100% of 26,187 populated rows** |
+| Rows with no coordinate | 1,769 | 766 |
+
+The 72 remaining flagged rows are all in Tables 4.47, 4.48, and 4.49
+(images 61–68) and are genuine, specific, disclosed uncertainty — an
+unidentified moss species, a footnote-only species with no printed
+constancy/mean values, a handful of cells in a two-association table that
+are legitimately hard to read even on a clean scan. These are left flagged
+on purpose rather than forced to a number that isn't really there. Table
+4.40 remains the one deliberate gap (still needs an actual rescan).
