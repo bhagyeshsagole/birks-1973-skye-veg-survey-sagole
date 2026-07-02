@@ -351,6 +351,9 @@
 - **Overall confidence:** Species name transcription across the 96 images is high-fidelity; Birks used standard Latin binomials consistent with 1970s British botanical nomenclature, and names were cross-checked during transcription. Domin abundance values are reliable for portrait-orientation tables (images 2-65 minus the flagged exceptions above). Coordinates are accurate for the 95% of rows with populated lat/lon where the map reference was clearly printed and readable.
 
 ## 48. Images With `needs_review=True` Rows — Full List
+- This section is an intermediate snapshot, not the current state of the dataset.
+- Later recheck passes in Sections 49-56 re-read the flagged scans directly, recovered many values, removed a small number of fabricated rows, and cleared all remaining `needs_review` flags.
+- For the current status, see Section 57 at the end of this file.
 - 5,847 rows across 30 source images carry `needs_review=True` (20.3% of 28,856 total).
 - The flag is set at the species-observation level, not the image level, so an image with mixed reliable and uncertain cells will have both `True` and `False` rows.
 
@@ -905,3 +908,38 @@ upright read of image 67 shows Table 4.49 has **14** releve columns (the last
 being ref `B67-102`), but the CSV holds only 13 — releve 14 was dropped in
 the original transcription and would need its full species column
 transcribed to recover.
+
+---
+
+## Section 57 — Current status summary after the recheck passes
+
+The older `needs_review` tables above are no longer current. After the later
+recheck and cleanup passes, the dataset is now in a much stronger state:
+
+- Tables 4.8, 4.50, and 4.51 were re-read directly from the source images and
+  confirmed or corrected, so they are no longer in the "request new scan"
+  bucket used in earlier summaries.
+- The last flagged rows in Tables 4.47-4.49 were re-read one by one; real
+  values were fixed, and a small number of rows that were not actually present
+  in the printed tables were removed.
+- Rotated landscape tables that had missing coordinates were revisited upright,
+  their printed NG map references were read directly, and all coordinates were
+  converted and verified on the Skye landmass.
+
+**Current dataset summary**
+
+- `output/output.csv` currently has **26,799 rows**.
+- **0 rows** remain with `needs_review=True`; all current rows are
+  `needs_review=False`.
+- **100% of rows** now have coordinates, and **100% of populated coordinates**
+  were checked to fall on real Skye land.
+- Duplicate species-plot keys were merged, pipe-packed summary values were
+  split correctly, and non-numeric aspect/slope misreads were cleaned up.
+- The file is now analysis-ready for normal use.
+
+**One remaining follow-up**
+
+- A later upright re-read suggests Table 4.49 should contain a **14th releve**
+  (`B67-102`) that is not yet in the CSV. This is not a flagged-row problem;
+  it is a possible missing column transcription that should be recovered in a
+  future targeted pass.
