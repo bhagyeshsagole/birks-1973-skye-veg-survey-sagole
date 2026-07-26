@@ -23,3 +23,5 @@ incognito.md
 docs/*_cache/
 docs/*_files/
 docs/skye_veg_eda.Rmd
+letter_of_recommendation.md
+*letter_of_recommendation*.md
